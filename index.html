@@ -19,10 +19,10 @@
     <h2>TA Diary</h2>
     <p class="login-sub">Travelling Allowance &amp; Tour Diary</p>
     <label>Email / User ID</label>
-    <input id="loginEmail" list="emailList" placeholder="you@example.com" autocomplete="username">
+    <input id="loginEmail" list="emailList" placeholder="you@example.com" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <datalist id="emailList"></datalist>
     <label>PIN</label>
-    <input id="loginPin" type="password" inputmode="numeric" maxlength="8" placeholder="Default PIN is 1234">
+    <input id="loginPin" type="text" class="pinmask" inputmode="numeric" maxlength="8" placeholder="Default PIN is 1234" autocomplete="off" autocorrect="off" data-form-type="other">
     <button class="btn primary block" id="loginBtn">Sign in</button>
     <p class="login-hint" id="loginMsg">First time? Your default PIN is <b>1234</b> — change it later in Settings.</p>
   </div>
@@ -376,7 +376,7 @@
     <div class="set-preview" id="setPreview">Preview — TA Bill &amp; Diary text 123 ₹</div>
     <hr>
     <label class="set-label">Change PIN</label>
-    <input id="setNewPin" type="password" inputmode="numeric" maxlength="8" placeholder="New PIN (4-8 digits)">
+    <input id="setNewPin" type="text" class="pinmask" inputmode="numeric" maxlength="8" placeholder="New PIN (4-8 digits)" autocomplete="off" data-form-type="other">
     <button class="btn ghost block" id="setSavePin" style="margin-top:8px">Update PIN</button>
 
     <div id="adminSettings" style="display:none">
@@ -417,8 +417,8 @@
   <div class="modal-card">
     <h3>Set your PIN</h3>
     <p class="login-sub" style="text-align:left;margin:0 0 12px">Welcome! For security, please set a new PIN (4–8 digits). You'll use it to sign in next time.</p>
-    <input id="pinNew1" type="password" inputmode="numeric" maxlength="8" placeholder="New PIN">
-    <input id="pinNew2" type="password" inputmode="numeric" maxlength="8" placeholder="Confirm PIN" style="margin-top:10px">
+    <input id="pinNew1" type="text" class="pinmask" inputmode="numeric" maxlength="8" placeholder="New PIN" autocomplete="off" data-form-type="other">
+    <input id="pinNew2" type="text" class="pinmask" inputmode="numeric" maxlength="8" placeholder="Confirm PIN" autocomplete="off" data-form-type="other" style="margin-top:10px">
     <button class="btn primary block" id="pinSave" style="margin-top:14px">Save PIN</button>
     <p class="login-hint" id="pinMsg"></p>
   </div>
