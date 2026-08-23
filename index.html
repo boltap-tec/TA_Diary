@@ -317,6 +317,20 @@
       <button class="btn ghost" id="btnNewProfile">＋ New officer</button>
       <button class="btn primary" id="btnSaveProfile">Save profile</button>
     </div>
+
+    <div class="section-head" style="margin-top:24px"><h2>🔒 Change PIN</h2></div>
+    <div class="field">
+      <label>New PIN (4–8 digits)</label>
+      <input id="pNewPin" type="text" class="pinmask" inputmode="numeric" maxlength="8" autocomplete="off" data-form-type="other" placeholder="Enter a new PIN">
+    </div>
+    <div class="field">
+      <label>Confirm new PIN</label>
+      <input id="pNewPin2" type="text" class="pinmask" inputmode="numeric" maxlength="8" autocomplete="off" data-form-type="other" placeholder="Re-enter the PIN">
+    </div>
+    <div class="form-actions">
+      <button class="btn primary block" id="btnChangePin">Update PIN</button>
+    </div>
+    <p class="hint" id="changePinMsg" style="margin-top:8px"></p>
   </section>
 
 </main>

@@ -1083,10 +1083,31 @@ function saveFont(){
 }
 $('#setFont').onchange=saveFont;
 $('#setFontSize').onchange=saveFont;
-$('#setSavePin').onclick=()=>{
-  const pin=$('#setNewPin').value.trim();
-  if(!/^\d{4,8}$/.test(pin)){ toast('PIN must be 4–8 digits'); return; }
-  setPin(DB.active,pin); markPinSet(DB.active); $('#setNewPin').value=''; toast('PIN updated ✓');
+// Unified PIN change — works in both cloud (Supabase password) and local (device PIN) modes.
+async function changePin(newPin){
+  if(!/^\d{4,8}$/.test(newPin)) return {ok:false, msg:'PIN must be 4–8 digits.'};
+  if(sbOn()){
+    try{
+      const {error}=await sbClient().auth.updateUser({ password:pinToPass(newPin), data:{pin_set:true} });
+      if(error) return {ok:false, msg:'Could not update PIN: '+error.message};
+    }catch(e){ return {ok:false, msg:'Network error. Please try again.'}; }
+  } else {
+    if(!DB.active) return {ok:false, msg:'Sign in first.'};
+    setPin(DB.active,newPin); markPinSet(DB.active);
+  }
+  return {ok:true, msg:'PIN updated ✓'};
+}
+$('#setSavePin').onclick=async ()=>{
+  const r=await changePin($('#setNewPin').value.trim());
+  toast(r.msg); if(r.ok) $('#setNewPin').value='';
+};
+$('#btnChangePin').onclick=async ()=>{
+  const a=$('#pNewPin').value.trim(), b=$('#pNewPin2').value.trim();
+  const msg=$('#changePinMsg');
+  if(a!==b){ msg.textContent='The two PINs do not match.'; msg.style.color='#b91c1c'; return; }
+  const r=await changePin(a);
+  msg.textContent=r.msg; msg.style.color=r.ok?'var(--ok)':'#b91c1c';
+  if(r.ok){ $('#pNewPin').value=''; $('#pNewPin2').value=''; toast(r.msg); }
 };
 
 /* ---- Admin controls ---- */
