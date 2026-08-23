@@ -30,7 +30,7 @@ L = ["-- TA Diary seed data (generated from seed.js). Run AFTER schema.sql.",
 
 L.append("-- profiles (" + str(len(d["profiles"])) + ")")
 for p in d["profiles"]:
-    L.append("insert into profiles(email,name,designation,basic,parent_office,pincode,daily_ta_fare,mileage_fare,max_bike,submit_to,submit_every,is_admin) values ("
+    L.append("insert into ta_profiles(email,name,designation,basic,parent_office,pincode,daily_ta_fare,mileage_fare,max_bike,submit_to,submit_every,is_admin) values ("
         + ",".join([q(p["email"]), qt(p.get("name")), qt(p.get("desg")), qt(p.get("basic")),
                     qt(p.get("parent")), qt(p.get("pincode")), num(p.get("daily")), num(p.get("mileage")),
                     num(p.get("maxBike")), qt(p.get("submitTo")), qt(p.get("every") or "Fortnight"),
@@ -40,7 +40,7 @@ for p in d["profiles"]:
 L.append("")
 L.append("-- entries (" + str(len(d["entries"])) + ")")
 for e in d["entries"]:
-    L.append("insert into entries(id,email,today,leave_type,office_from,office_to,from_date,from_time,to_date,to_time,mode,distance,fare,days,trip,completed,diary_detail,diary_short,ta_short,purpose) values ("
+    L.append("insert into ta_entries(id,email,today,leave_type,office_from,office_to,from_date,from_time,to_date,to_time,mode,distance,fare,days,trip,completed,diary_detail,diary_short,ta_short,purpose) values ("
         + ",".join([q(e["id"]), q(e["email"]), qt(e.get("today")), qt(e.get("leaveType")),
                     qt(e.get("officeFrom")), qt(e.get("officeTo")), dt(e.get("fromDate")), dt(e.get("fromTime")),
                     dt(e.get("toDate")), dt(e.get("toTime")), qt(e.get("mode")), num(e.get("distance")),
@@ -52,7 +52,7 @@ for e in d["entries"]:
 L.append("")
 L.append("-- visits (" + str(len(d["visits"])) + ")")
 for v in d["visits"]:
-    L.append("insert into visits(id,email,date,office,pincode,ref,hw,sw,apt_dtr,bo_bal,disc,purpose,result) values ("
+    L.append("insert into ta_visits(id,email,date,office,pincode,ref,hw,sw,apt_dtr,bo_bal,disc,purpose,result) values ("
         + ",".join([q(v["id"]), q(v["email"]), dt(v.get("date")), qt(v.get("office")), qt(v.get("pincode")),
                     qt(v.get("ref")), jb(v.get("hw")), jb(v.get("sw")), qt(v.get("aptDtr")), qt(v.get("boBal")),
                     qt(v.get("disc")), qt(v.get("purpose")), qt(v.get("result"))])
@@ -62,14 +62,14 @@ op = d.get("officePins", {})
 L.append("")
 L.append("-- offices (" + str(len(op)) + ")")
 for name, pin in op.items():
-    L.append("insert into offices(name,pincode) values (" + q(name) + "," + qt(pin) + ") on conflict (name) do nothing;")
+    L.append("insert into ta_offices(name,pincode) values (" + q(name) + "," + qt(pin) + ") on conflict (name) do nothing;")
 
 rt = d.get("routes", {})
 L.append("")
 L.append("-- routes (" + str(len(rt)) + ")")
 for k, val in rt.items():
     fr, _, to = k.partition("||")
-    L.append("insert into routes(office_from,office_to,distance,fare) values ("
+    L.append("insert into ta_routes(office_from,office_to,distance,fare) values ("
         + ",".join([q(fr), q(to), num(val.get("d")), num(val.get("f"))])
         + ") on conflict (office_from,office_to) do nothing;")
 

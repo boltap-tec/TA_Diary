@@ -1,10 +1,12 @@
 -- ============================================================
 -- TA Diary — Supabase schema (tables + Row-Level Security)
+-- All objects are prefixed ta_ so they never collide with other
+-- projects (e.g. mlarfinance) in the same Supabase database.
 -- Run this ONCE in Supabase → SQL Editor, THEN run seed.sql.
 -- ============================================================
 
 -- ---------- Tables ----------
-create table if not exists profiles (
+create table if not exists ta_profiles (
   email          text primary key,
   name           text,
   designation    text,
@@ -21,9 +23,9 @@ create table if not exists profiles (
   created_at     timestamptz default now()
 );
 
-create table if not exists entries (
+create table if not exists ta_entries (
   id           text primary key,
-  email        text references profiles(email) on delete cascade,
+  email        text references ta_profiles(email) on delete cascade,
   today        text,
   leave_type   text,
   office_from  text,
@@ -44,12 +46,12 @@ create table if not exists entries (
   purpose      text,
   updated_at   timestamptz default now()
 );
-create index if not exists entries_email_idx on entries(email);
-create index if not exists entries_date_idx  on entries(from_date);
+create index if not exists ta_entries_email_idx on ta_entries(email);
+create index if not exists ta_entries_date_idx  on ta_entries(from_date);
 
-create table if not exists visits (
+create table if not exists ta_visits (
   id       text primary key,
-  email    text references profiles(email) on delete cascade,
+  email    text references ta_profiles(email) on delete cascade,
   date     date,
   office   text,
   pincode  text,
@@ -63,14 +65,14 @@ create table if not exists visits (
   result   text,
   updated_at timestamptz default now()
 );
-create index if not exists visits_email_idx on visits(email);
+create index if not exists ta_visits_email_idx on ta_visits(email);
 
-create table if not exists offices (
+create table if not exists ta_offices (
   name    text primary key,
   pincode text
 );
 
-create table if not exists routes (
+create table if not exists ta_routes (
   office_from text,
   office_to   text,
   distance    numeric,
@@ -79,49 +81,49 @@ create table if not exists routes (
 );
 
 -- ---------- Helpers: current user email + admin check ----------
--- SECURITY DEFINER lets is_admin() read profiles without tripping RLS (avoids recursion).
-create or replace function current_email() returns text
+-- SECURITY DEFINER lets ta_is_admin() read ta_profiles without tripping RLS (avoids recursion).
+create or replace function ta_current_email() returns text
   language sql stable as $$ select nullif(auth.jwt() ->> 'email','') $$;
 
-create or replace function is_admin() returns boolean
+create or replace function ta_is_admin() returns boolean
   language sql stable security definer set search_path = public as
-  $$ select coalesce((select is_admin from profiles where email = current_email()), false) $$;
+  $$ select coalesce((select is_admin from ta_profiles where email = ta_current_email()), false) $$;
 
 -- ---------- Row-Level Security ----------
-alter table profiles enable row level security;
-alter table entries  enable row level security;
-alter table visits   enable row level security;
-alter table offices  enable row level security;
-alter table routes   enable row level security;
+alter table ta_profiles enable row level security;
+alter table ta_entries  enable row level security;
+alter table ta_visits   enable row level security;
+alter table ta_offices  enable row level security;
+alter table ta_routes   enable row level security;
 
--- profiles: a user sees/updates their own row; admin sees/manages all
-drop policy if exists profiles_select on profiles;
-create policy profiles_select on profiles for select
-  using (email = current_email() or is_admin());
-drop policy if exists profiles_update on profiles;
-create policy profiles_update on profiles for update
-  using (email = current_email() or is_admin())
-  with check (email = current_email() or is_admin());
-drop policy if exists profiles_admin_all on profiles;
-create policy profiles_admin_all on profiles for all
-  using (is_admin()) with check (is_admin());
+-- ta_profiles: a user sees/updates their own row; admin sees/manages all
+drop policy if exists ta_profiles_select on ta_profiles;
+create policy ta_profiles_select on ta_profiles for select
+  using (email = ta_current_email() or ta_is_admin());
+drop policy if exists ta_profiles_update on ta_profiles;
+create policy ta_profiles_update on ta_profiles for update
+  using (email = ta_current_email() or ta_is_admin())
+  with check (email = ta_current_email() or ta_is_admin());
+drop policy if exists ta_profiles_admin_all on ta_profiles;
+create policy ta_profiles_admin_all on ta_profiles for all
+  using (ta_is_admin()) with check (ta_is_admin());
 
--- entries / visits: own rows only; admin all
-drop policy if exists entries_all on entries;
-create policy entries_all on entries for all
-  using (email = current_email() or is_admin())
-  with check (email = current_email() or is_admin());
-drop policy if exists visits_all on visits;
-create policy visits_all on visits for all
-  using (email = current_email() or is_admin())
-  with check (email = current_email() or is_admin());
+-- ta_entries / ta_visits: own rows only; admin all
+drop policy if exists ta_entries_all on ta_entries;
+create policy ta_entries_all on ta_entries for all
+  using (email = ta_current_email() or ta_is_admin())
+  with check (email = ta_current_email() or ta_is_admin());
+drop policy if exists ta_visits_all on ta_visits;
+create policy ta_visits_all on ta_visits for all
+  using (email = ta_current_email() or ta_is_admin())
+  with check (email = ta_current_email() or ta_is_admin());
 
--- offices / routes: any signed-in user reads; only admin writes
-drop policy if exists offices_read on offices;
-create policy offices_read on offices for select using (auth.role() = 'authenticated');
-drop policy if exists offices_admin on offices;
-create policy offices_admin on offices for all using (is_admin()) with check (is_admin());
-drop policy if exists routes_read on routes;
-create policy routes_read on routes for select using (auth.role() = 'authenticated');
-drop policy if exists routes_admin on routes;
-create policy routes_admin on routes for all using (is_admin()) with check (is_admin());
+-- ta_offices / ta_routes: any signed-in user reads; only admin writes
+drop policy if exists ta_offices_read on ta_offices;
+create policy ta_offices_read on ta_offices for select using (auth.role() = 'authenticated');
+drop policy if exists ta_offices_admin on ta_offices;
+create policy ta_offices_admin on ta_offices for all using (ta_is_admin()) with check (ta_is_admin());
+drop policy if exists ta_routes_read on ta_routes;
+create policy ta_routes_read on ta_routes for select using (auth.role() = 'authenticated');
+drop policy if exists ta_routes_admin on ta_routes;
+create policy ta_routes_admin on ta_routes for all using (ta_is_admin()) with check (ta_is_admin());
