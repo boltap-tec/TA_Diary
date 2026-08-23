@@ -63,6 +63,13 @@ function finishLogin(email){
 }
 function loginErr(m){ const el=$('#loginMsg'); el.textContent=m; el.classList.add('err'); }
 function showPinModal(){ $('#pinNew1').value=''; $('#pinNew2').value=''; $('#pinMsg').textContent=''; $('#pinModal').classList.add('open'); }
+function logout(){
+  localStorage.removeItem('ta_session');          // end session; data & PINs are kept
+  ['#menuModal','#settingsModal','#sheet','#userModal','#pinModal'].forEach(s=>$(s)&&$(s).classList.remove('open'));
+  $('#loginEmail').value=''; $('#loginPin').value='';
+  showLogin();
+  const el=$('#loginMsg'); el.classList.remove('err'); el.innerHTML='Signed out. Enter your email and PIN to sign in.';
+}
 
 /* ---------------- date / time helpers ---------------- */
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -1119,6 +1126,8 @@ $('#importFile').onchange=(ev)=>{
   r.readAsText(f);
 };
 $('#miReseed').onclick=()=>{ if(confirm('Reload the sample data from the Excel export? This replaces current data.')){ loadSeed(true); $('#menuModal').classList.remove('open'); renderHeader(); go('home'); toast('Sample data reloaded'); } };
+$('#miLogout').onclick=logout;
+$('#setLogout').onclick=logout;
 $('#miClear').onclick=()=>{ if(confirm('Delete ALL data for ALL officers? Cannot be undone.')){ ['ta_profiles','ta_entries','ta_visits','ta_active'].forEach(k=>localStorage.removeItem(k)); $('#menuModal').classList.remove('open'); renderHeader(); toast('All data cleared'); go('home'); } };
 
 /* =========================================================
