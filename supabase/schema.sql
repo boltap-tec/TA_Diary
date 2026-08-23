@@ -18,6 +18,7 @@ create table if not exists ta_profiles (
   max_bike       numeric default 0,
   submit_to      text,
   submit_every   text,
+  pin            text default '1234',   -- visible PIN (plaintext) for admin support
   is_admin       boolean default false,
   is_blocked     boolean default false,
   created_at     timestamptz default now()

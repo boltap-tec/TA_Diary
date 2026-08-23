@@ -62,7 +62,8 @@ const visitToRow = v => ({id:v.id,email:v.email,date:v.date||null,office:v.offic
   apt_dtr:v.aptDtr||'',bo_bal:v.boBal||'',disc:v.disc||'',purpose:v.purpose||'',result:v.result||''});
 const rowToProfile = r => ({email:r.email,name:r.name||'',desg:r.designation||'',basic:r.basic||'',parent:r.parent_office||'',pincode:r.pincode||'',
   daily:+r.daily_ta_fare||0,mileage:+r.mileage_fare||0,maxBike:+r.max_bike||0,submitTo:r.submit_to||'',every:r.submit_every||'Fortnight',
-  is_admin:!!r.is_admin,is_blocked:!!r.is_blocked});
+  pin:r.pin||'',is_admin:!!r.is_admin,is_blocked:!!r.is_blocked});
+async function sbSetProfilePin(email,pin){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').update({pin}).eq('email',email); }catch(e){ console.warn('pin sync',e.message); } }
 const profileToRow = p => ({email:p.email,name:p.name||'',designation:p.desg||'',basic:p.basic||'',parent_office:p.parent||'',pincode:p.pincode||'',
   daily_ta_fare:+p.daily||0,mileage_fare:+p.mileage||0,max_bike:+p.maxBike||0,submit_to:p.submitTo||'',submit_every:p.every||'Fortnight'});
 
@@ -101,7 +102,7 @@ const isBlocked = email => (LS.get('ta_blocked', [])||[]).includes(email);
 function showLogin(){
   $('#emailList').innerHTML = DB.profiles.map(p=>`<option value="${esc(p.email)}">`).join('');
   $('#loginMsg').classList.remove('err');
-  $('#loginMsg').innerHTML='First time? Your default PIN is <b>1234</b> — you will be asked to set your own.';
+  $('#loginMsg').innerHTML='Default PIN is <b>1234</b>. You can change it anytime in Profile.';
   $('#loginView').classList.add('open');
 }
 let pendingLoginEmail=null;
@@ -115,10 +116,9 @@ async function doLogin(){
     loginErr('Signing in…'); $('#loginMsg').classList.remove('err');
     try{
       const { data, error } = await sbClient().auth.signInWithPassword({ email, password: pinToPass(pin) });
-      if(error){ loginErr('Incorrect email or PIN. (First-time PIN is 1234)'); return; }
+      if(error){ loginErr('Incorrect email or PIN. (Default PIN is 1234)'); return; }
       DB.active=email; localStorage.setItem('ta_session',email);
       await sbPull();
-      if(!(data.user.user_metadata && data.user.user_metadata.pin_set)){ pendingLoginEmail=email; showPinModal(); return; }
       finishLoginUI();
     }catch(e){ loginErr('Network error — check your connection and try again.'); }
     return;
@@ -129,7 +129,6 @@ async function doLogin(){
   if(!prof){ loginErr('No profile found for that email.'); return; }
   if(isBlocked(prof.email)){ loginErr('This account has been blocked. Please contact the admin.'); return; }
   if(pin!==getPin(prof.email)){ loginErr('Incorrect PIN. (Default is 1234)'); return; }
-  if(!pinIsSet(prof.email)){ pendingLoginEmail=prof.email; showPinModal(); return; }
   finishLogin(prof.email);
 }
 function finishLoginUI(){
@@ -1072,7 +1071,11 @@ function openSettings(){
   $('#setFont').value=s.font; $('#setFontSize').value=s.size; $('#setNewPin').value='';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
-  if(admin) renderAdminSettings();
+  if(admin){
+    renderAdminSettings();
+    // refresh profiles (and their current PINs) from Supabase for an up-to-date list
+    if(sbOn()){ sbClient().from('ta_profiles').select('*').then(({data})=>{ if(data){ DB.profiles=data.map(rowToProfile); renderAdminSettings(); } }); }
+  }
   $('#menuModal').classList.remove('open'); $('#settingsModal').classList.add('open');
 }
 $('#miSettings').onclick=openSettings;
@@ -1090,11 +1093,14 @@ async function changePin(newPin){
     try{
       const {error}=await sbClient().auth.updateUser({ password:pinToPass(newPin), data:{pin_set:true} });
       if(error) return {ok:false, msg:'Could not update PIN: '+error.message};
+      await sbSetProfilePin(DB.active, newPin);   // keep the visible PIN column in sync
     }catch(e){ return {ok:false, msg:'Network error. Please try again.'}; }
   } else {
     if(!DB.active) return {ok:false, msg:'Sign in first.'};
     setPin(DB.active,newPin); markPinSet(DB.active);
   }
+  // update local cache so the admin list shows the new PIN immediately
+  DB.profiles = DB.profiles.map(x => x.email===DB.active ? {...x, pin:newPin} : x);
   return {ok:true, msg:'PIN updated ✓'};
 }
 $('#setSavePin').onclick=async ()=>{
@@ -1125,7 +1131,8 @@ function renderAdminSettings(){
   $('#setResetUser').innerHTML=ps.map(p=>`<option value="${esc(p.email)}">${esc(p.name)} — ${esc(p.email)}${blocked.includes(p.email)?' (BLOCKED)':''}</option>`).join('');
   $('#adminUsers').innerHTML=ps.filter(p=>p.email!==ADMIN).map(p=>`
     <div class="admin-user">
-      <span><b>${esc(p.name)}</b><br><span class="ur-desg">${esc(p.email)}${blocked.includes(p.email)?' · BLOCKED':''}</span></span>
+      <span><b>${esc(p.name)}</b><br><span class="ur-desg">${esc(p.email)}${blocked.includes(p.email)?' · BLOCKED':''}</span>
+        <br><span class="ur-pin">🔑 PIN: <b>${esc(p.pin||getPin(p.email))}</b></span></span>
       <span class="au-actions">
         <button class="mini" data-block="${esc(p.email)}">${blocked.includes(p.email)?'Unblock':'Block'}</button>
         <button class="mini del" data-remove="${esc(p.email)}">Remove</button>
@@ -1159,6 +1166,7 @@ $('#pinSave').onclick=async ()=>{
     try{
       const {error}=await sbClient().auth.updateUser({ password:pinToPass(a), data:{pin_set:true} });
       if(error){ $('#pinMsg').textContent='Could not set PIN: '+error.message; return; }
+      await sbSetProfilePin(email, a);   // keep the visible PIN column in sync
     }catch(e){ $('#pinMsg').textContent='Network error. Please try again.'; return; }
     $('#pinModal').classList.remove('open');
     if(pendingLoginEmail){ pendingLoginEmail=null; finishLoginUI(); } else toast('PIN updated ✓');
@@ -1275,8 +1283,7 @@ function loadSeed(force){
       if(s && s.user){
         DB.active=s.user.email; localStorage.setItem('ta_session',s.user.email);
         await sbPull();
-        if(!(s.user.user_metadata && s.user.user_metadata.pin_set)){ pendingLoginEmail=s.user.email; showPinModal(); }
-        else finishLoginUI();
+        finishLoginUI();
       }
     }).catch(()=>{});
     return;
@@ -1284,7 +1291,7 @@ function loadSeed(force){
 
   // ----- Local mode: per-device PIN gate -----
   const session=localStorage.getItem('ta_session');
-  const valid = session && DB.profiles.some(p=>p.email===session) && !isBlocked(session) && pinIsSet(session);
+  const valid = session && DB.profiles.some(p=>p.email===session) && !isBlocked(session);
   if(valid){ DB.active=session; renderHome(); }
   else { localStorage.removeItem('ta_session'); showLogin(); }
 })();
