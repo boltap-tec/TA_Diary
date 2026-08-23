@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#7b1113">
+<title>TA Diary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Merriweather:wght@400;700&family=Lora:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div class="login" id="loginView">
+  <div class="login-card">
+    <div class="login-logo">TA</div>
+    <h2>TA Diary</h2>
+    <p class="login-sub">Travelling Allowance &amp; Tour Diary</p>
+    <label>Email / User ID</label>
+    <input id="loginEmail" list="emailList" placeholder="you@example.com" autocomplete="username">
+    <datalist id="emailList"></datalist>
+    <label>PIN</label>
+    <input id="loginPin" type="password" inputmode="numeric" maxlength="8" placeholder="Default PIN is 1234">
+    <button class="btn primary block" id="loginBtn">Sign in</button>
+    <p class="login-hint" id="loginMsg">First time? Your default PIN is <b>1234</b> — change it later in Settings.</p>
+  </div>
+</div>
+
+<!-- ============ APP HEADER ============ -->
+<header class="appbar">
+  <button class="user-switch" id="btnUser">
+    <span class="avatar" id="avatar">?</span>
+    <span class="user-meta">
+      <span class="user-name" id="userName">TA Diary</span>
+      <span class="user-desg" id="userDesg">Tap to switch officer ▾</span>
+    </span>
+  </button>
+  <button class="icon-btn" id="btnMenu" title="Menu">⋮</button>
+</header>
+
+<main id="app">
+
+  <!-- ---- HOME ---- -->
+  <section class="view active" id="view-home">
+    <div class="credit" id="homeCredit">Created by <b>Arul M</b> · DSM, Karur Division</div>
+
+    <div class="balance">
+      <div class="balance-glow"></div>
+      <div class="balance-top">
+        <span class="balance-label" id="balPeriod">This month</span>
+        <span class="chip chip-live" id="balStatus">At HQ</span>
+      </div>
+      <div class="balance-amt">₹<span id="balAmount">0</span></div>
+      <div class="balance-sub">Estimated travelling allowance</div>
+      <div class="balance-stats" id="balStats"></div>
+    </div>
+
+    <button class="nextcard" id="nextEntry">
+      <div class="nc-cal">
+        <span class="nc-mon" id="ncMon">—</span>
+        <span class="nc-num" id="ncNum">–</span>
+      </div>
+      <div class="nc-body">
+        <div class="nc-label">Next diary entry</div>
+        <div class="nc-day" id="ncDay">—</div>
+        <div class="nc-note" id="ncNote"></div>
+      </div>
+      <div class="nc-cta">＋</div>
+    </button>
+
+    <div class="quick quick4">
+      <button class="quick-btn" data-view="entry" id="qEntry"><span>＋</span>New</button>
+      <button class="quick-btn" data-view="reports"><span>🧾</span>TA Bill</button>
+      <button class="quick-btn" data-view="month"><span>📅</span>Month</button>
+      <button class="quick-btn" data-view="visit"><span>🖥️</span>Visit</button>
+    </div>
+
+    <div class="section-head">
+      <h2>Diary</h2>
+      <div class="seg" id="homeFilter">
+        <button data-f="all" class="active">All</button>
+        <button data-f="Outside">Tour</button>
+        <button data-f="Parent_Office">Office</button>
+        <button data-f="Leave">Leave</button>
+      </div>
+    </div>
+    <div id="entryList" class="list"></div>
+  </section>
+
+  <!-- ---- NEW / EDIT ENTRY ---- -->
+  <section class="view" id="view-entry">
+    <div class="form-title" id="entryFormTitle">New daily entry</div>
+
+    <div class="field">
+      <label>Today's work</label>
+      <div class="chips-pick" id="todayWork">
+        <button data-v="Parent_Office">🏢 Office</button>
+        <button data-v="Outside">🛵 Outside</button>
+        <button data-v="Holiday">🌿 Holiday</button>
+        <button data-v="Leave">🏖️ Leave</button>
+      </div>
+    </div>
+
+    <div class="field" id="leaveTypeField" style="display:none">
+      <label>Leave type</label>
+      <input id="fLeaveType" list="leaveList" placeholder="Leave / Other — pick or type">
+      <datalist id="leaveList">
+        <option value="Leave (CL)"></option>
+        <option value="Leave-EL"></option>
+        <option value="Leave-Medical"></option>
+        <option value="Other"></option>
+      </datalist>
+    </div>
+
+    <div class="context" id="entryContext"></div>
+
+    <div id="tripFields">
+      <div class="grid2" id="wrapOffices">
+        <div class="field">
+          <label id="lblOfficeFrom">From Office/Place</label>
+          <input type="text" id="fOfficeFrom" placeholder="From office / place" list="officeList">
+        </div>
+        <div class="field" id="wrapOfficeTo">
+          <label id="lblOfficeTo">To Office/Place</label>
+          <input type="text" id="fOfficeTo" placeholder="To office / place" list="officeList">
+        </div>
+      </div>
+
+      <div class="field" id="wrapFromDate">
+        <label><span id="lblFromDate">Date</span> <span class="mini-hint" id="fromDay"></span></label>
+        <input type="date" id="fFromDate">
+      </div>
+
+      <div class="field" id="wrapToDate">
+        <label><span id="lblToDate">To date</span> <span class="mini-hint" id="toDay"></span></label>
+        <input type="date" id="fToDate">
+      </div>
+
+      <div class="grid2" id="wrapTimes">
+        <div class="field"><label>From time</label><input type="time" id="fFromTime"></div>
+        <div class="field"><label>To time</label><input type="time" id="fToTime"></div>
+      </div>
+
+      <div class="grid3" id="wrapMode">
+        <div class="field">
+          <label>Mode</label>
+          <input type="text" id="fMode" list="modeList" placeholder="Bike / Bus / Custom…">
+          <datalist id="modeList">
+            <option value="Bike"></option><option value="Bus"></option><option value="Train"></option>
+            <option value="Auto"></option><option value="Jeep"></option><option value="Car"></option>
+            <option value="Walk"></option><option value="Other"></option>
+          </datalist>
+        </div>
+        <div class="field" id="wrapDistance">
+          <label>Distance (km) <span class="mini-hint" id="dfHint"></span></label>
+          <input type="number" step="0.1" id="fDistance" placeholder="0" list="distList">
+          <datalist id="distList"></datalist>
+        </div>
+        <div class="field" id="wrapFare">
+          <label>Fare (₹)</label>
+          <input type="number" step="0.5" id="fFare" placeholder="0" list="fareList">
+          <datalist id="fareList"></datalist>
+        </div>
+      </div>
+
+      <div class="field" id="wrapDiaryDetail">
+        <label id="lblPurpose">Diary detail text</label>
+        <textarea id="fDiaryDetail" rows="3" placeholder="Detailed narrative — shown in the Diary description"></textarea>
+        <select id="diaryDetailSug" class="sug-select"><option value="">💡 Insert a saved note…</option></select>
+        <button type="button" class="ocr-btn" id="ocrBtn">📷 Scan text from photo (OCR)</button>
+        <input type="file" id="ocrFile" accept="image/*" capture="environment" hidden>
+        <div class="ocr-status" id="ocrStatus"></div>
+      </div>
+      <div class="field" id="wrapDiaryShort">
+        <label>Diary short text</label>
+        <input type="text" id="fDiaryShort" placeholder="Short purpose — Diary journey table" list="shortList">
+      </div>
+      <div class="field" id="wrapTaShort">
+        <label>TA short text</label>
+        <input type="text" id="fTaShort" placeholder="Short purpose — TA Bill (e.g. Inspn, New S.O)" list="taShortList">
+      </div>
+      <datalist id="shortList"></datalist>
+      <datalist id="taShortList"></datalist>
+
+      <div class="grid2">
+        <div class="field" id="wrapCompleted">
+          <label>Trip completed?</label>
+          <select id="fCompleted">
+            <option value="No">No — still on tour</option>
+            <option value="Yes">Yes — returned to HQ</option>
+          </select>
+        </div>
+        <div class="field" id="wrapDays">
+          <label>Days (DA) <span class="mini-hint" id="daHint"></span></label>
+          <input type="number" step="0.1" id="fDays" placeholder="0">
+        </div>
+      </div>
+      <p class="hint" id="completeHint"></p>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn ghost" id="btnCancelEntry">Cancel</button>
+      <button class="btn danger" id="btnDeleteEntry" style="display:none">Delete</button>
+      <button class="btn primary" id="btnSaveEntry">Save entry</button>
+    </div>
+  </section>
+
+  <!-- ---- MONTH SUMMARY ---- -->
+  <section class="view" id="view-month">
+    <div class="month-head">
+      <button class="mnav" id="monthPrev">‹</button>
+      <div class="form-title" id="monthTitle" style="margin:0">Month</div>
+      <button class="mnav" id="monthNext">›</button>
+    </div>
+    <div id="monthSummary" class="month-summary"></div>
+    <div class="section-head"><h2>Day by day</h2><span class="hint" style="margin:0">Tap a missing day to add</span></div>
+    <div id="monthGrid" class="month-list"></div>
+  </section>
+
+  <!-- ---- REPORTS ---- -->
+  <section class="view" id="view-reports">
+    <div class="form-title">Reports</div>
+    <div class="grid2">
+      <div class="field"><label>From date</label><input type="date" id="rpFrom"></div>
+      <div class="field"><label>To date</label><input type="date" id="rpTo"></div>
+    </div>
+    <div class="seg seg-wide" id="rpQuick">
+      <button data-q="thisFN">This fortnight</button>
+      <button data-q="thisMonth">This month</button>
+      <button data-q="all">All</button>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Advance received (₹)</label><input type="number" step="1" id="rpAdvance" placeholder="0"></div>
+      <div class="field"><label>Hotel rent / staying charges (₹)</label><input type="number" step="1" id="rpHotel" placeholder="0"></div>
+    </div>
+
+    <div class="report-cards">
+      <button class="report-card" data-r="ta">
+        <div class="rc-ico rc-a">🧾</div>
+        <div class="rc-body"><div class="rc-t">TA Bill (Tour)</div><div class="rc-s">GAR-14A + food certificate</div></div>
+        <div class="rc-arrow">›</div>
+      </button>
+      <button class="report-card" data-r="diary">
+        <div class="rc-ico rc-b">📓</div>
+        <div class="rc-body"><div class="rc-t">Tour Diary</div><div class="rc-s">Fortnightly diary of journeys</div></div>
+        <div class="rc-arrow">›</div>
+      </button>
+      <button class="report-card" data-r="visit">
+        <div class="rc-ico rc-c">🖥️</div>
+        <div class="rc-body"><div class="rc-t">Visit Report</div><div class="rc-s">Office hardware / software status</div></div>
+        <div class="rc-arrow">›</div>
+      </button>
+    </div>
+
+    <div id="reportSummary" class="report-summary"></div>
+  </section>
+
+  <!-- ---- VISIT REPORT FORM ---- -->
+  <section class="view" id="view-visit">
+    <div class="form-title">Office Visit Report</div>
+    <div class="grid2">
+      <div class="field"><label>Office visited</label><input id="vOffice" placeholder="Office name" list="officeList"></div>
+      <div class="field"><label>Pincode</label><input id="vPincode" placeholder="6-digit"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Visited on</label><input type="date" id="vDate"></div>
+      <div class="field"><label>Reference (if any)</label><input id="vRef" placeholder="e.g. DO Orders"></div>
+    </div>
+
+    <div class="vgroup-title">🔌 Hardware</div>
+    <div id="vHardware"></div>
+    <div class="vgroup-title">💾 Software</div>
+    <div id="vSoftware"></div>
+
+    <div class="field"><label>Balance in APT and DTR</label><input id="vAptDtr" value="No issue reported by official"></div>
+    <div class="field"><label>BO Balance in DTR (Manual Daily A/c)</label><input id="vBoBal" value="No issue reported by official"></div>
+    <div class="field"><label>Any other discrepancies</label><textarea id="vDisc" rows="2"></textarea></div>
+    <div class="field"><label>Purpose of visit</label><textarea id="vPurpose" rows="2"></textarea></div>
+    <div class="field"><label>Result</label><textarea id="vResult" rows="2"></textarea></div>
+
+    <div class="form-actions">
+      <button class="btn ghost" id="btnCancelVisit">Cancel</button>
+      <button class="btn primary" id="btnSaveVisit">Save &amp; preview</button>
+    </div>
+
+    <div class="section-head"><h2>Saved visit reports</h2></div>
+    <div id="visitList" class="list"></div>
+  </section>
+
+  <!-- ---- PROFILE ---- -->
+  <section class="view" id="view-profile">
+    <div class="form-title">Profile</div>
+    <div class="field"><label>Name</label><input id="pName" placeholder="Full name"></div>
+    <div class="field"><label>Designation</label><input id="pDesg" placeholder="e.g. Inspector of Posts"></div>
+    <div class="grid2">
+      <div class="field"><label>Basic pay</label><input id="pBasic" placeholder="e.g. 52000"></div>
+      <div class="field"><label>Email / User ID</label><input id="pEmail" placeholder="you@example.com"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Parent office (HQ)</label><input id="pParent" placeholder="Head quarters office"></div>
+      <div class="field"><label>HQ pincode</label><input id="pPincode" placeholder="6-digit"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Daily DA fare (₹/day)</label><input type="number" id="pDaily" placeholder="e.g. 1000"></div>
+      <div class="field"><label>Mileage fare (₹/km)</label><input type="number" step="0.01" id="pMileage" placeholder="e.g. 15"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Max bike distance (km)</label><input type="number" id="pMaxBike" placeholder="e.g. 500"></div>
+      <div class="field"><label>Diary submitted every</label>
+        <select id="pEvery"><option>Fortnight</option><option>Month</option><option>Week</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Diary submitted to</label><input id="pSubmitTo" placeholder="e.g. The SPO's, Karur Division"></div>
+    <div class="form-actions">
+      <button class="btn ghost" id="btnNewProfile">＋ New officer</button>
+      <button class="btn primary" id="btnSaveProfile">Save profile</button>
+    </div>
+  </section>
+
+</main>
+
+<datalist id="officeList"></datalist>
+
+<!-- ============ BOTTOM NAV ============ -->
+<nav class="tabbar">
+  <button class="tab active" data-view="home"><span>🏠</span>Home</button>
+  <button class="tab" data-view="reports"><span>📄</span>Reports</button>
+  <button class="tab tab-fab" data-view="entry" id="tabAdd"><span>＋</span></button>
+  <button class="tab" data-view="visit"><span>🖥️</span>Visit</button>
+  <button class="tab" data-view="profile"><span>👤</span>Profile</button>
+</nav>
+
+<!-- ============ REPORT SHEET ============ -->
+<div class="sheet" id="sheet" aria-hidden="true">
+  <div class="sheet-bar no-print">
+    <button class="btn ghost" id="sheetClose">←</button>
+    <div class="sheet-title" id="sheetTitle">Report</div>
+    <button class="btn ghost" id="sheetWord">⬇ Word</button>
+    <button class="btn primary" id="sheetPrint">🖨 PDF</button>
+  </div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<!-- ============ USER SWITCH MODAL ============ -->
+<div class="modal" id="userModal" aria-hidden="true">
+  <div class="modal-card">
+    <h3>Switch officer</h3>
+    <div id="userList" class="user-list"></div>
+    <button class="btn ghost block" id="userClose">Close</button>
+  </div>
+</div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal" id="settingsModal" aria-hidden="true">
+  <div class="modal-card">
+    <h3>Settings</h3>
+    <label class="set-label">Report font style</label>
+    <select id="setFont">
+      <option value="'Times New Roman', serif">Times New Roman (classic)</option>
+      <option value="'Lora', serif">Lora (elegant serif)</option>
+      <option value="'Merriweather', serif">Merriweather (bold serif)</option>
+      <option value="Georgia, serif">Georgia</option>
+      <option value="'Plus Jakarta Sans', sans-serif">Jakarta Sans (modern)</option>
+      <option value="'Segoe UI', Arial, sans-serif">Segoe UI (clean sans)</option>
+      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+    </select>
+    <label class="set-label">Report font size</label>
+    <select id="setFontSize">
+      <option value="10.5px">Small</option>
+      <option value="12px">Normal</option>
+      <option value="13.5px">Large</option>
+      <option value="15px">Extra large</option>
+    </select>
+    <div class="set-preview" id="setPreview">Preview — TA Bill &amp; Diary text 123 ₹</div>
+    <hr>
+    <label class="set-label">Change PIN</label>
+    <input id="setNewPin" type="password" inputmode="numeric" maxlength="8" placeholder="New PIN (4-8 digits)">
+    <button class="btn ghost block" id="setSavePin" style="margin-top:8px">Update PIN</button>
+
+    <div id="adminSettings" style="display:none">
+      <hr>
+      <div class="set-label" style="color:var(--brand)">Admin controls</div>
+      <label class="set-label">Add Hardware module (Visit)</label>
+      <div class="row-add"><input id="setNewHw" placeholder="e.g. Biometric Scanner"><button class="btn ghost" id="setAddHw">Add</button></div>
+      <label class="set-label">Add Software module (Visit)</label>
+      <div class="row-add"><input id="setNewSw" placeholder="e.g. DARPAN"><button class="btn ghost" id="setAddSw">Add</button></div>
+      <div id="customModules" class="custom-mods"></div>
+      <label class="set-label">Reset a user's PIN to 1234</label>
+      <select id="setResetUser"></select>
+      <button class="btn ghost block" id="setResetPin" style="margin-top:8px">Reset PIN</button>
+      <label class="set-label">Manage users (block / remove)</label>
+      <div id="adminUsers" class="admin-users"></div>
+    </div>
+
+    <button class="btn ghost block" id="settingsClose" style="margin-top:14px">Close</button>
+  </div>
+</div>
+
+<!-- ============ MENU MODAL ============ -->
+<div class="modal" id="menuModal" aria-hidden="true">
+  <div class="modal-card">
+    <h3>Menu</h3>
+    <button class="menu-item" id="miSettings">⚙️ Settings (font, PIN, admin)</button>
+    <button class="menu-item" id="miExport">⬇️ Export backup (JSON)</button>
+    <button class="menu-item" id="miImport">⬆️ Import backup (JSON)</button>
+    <button class="menu-item" id="miReseed">🔄 Reload sample data (from Excel)</button>
+    <button class="menu-item danger" id="miClear">🗑️ Clear all data</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+    <button class="btn ghost block" id="miClose">Close</button>
+  </div>
+</div>
+
+<!-- ============ FORCE PIN CHANGE MODAL ============ -->
+<div class="modal" id="pinModal" aria-hidden="true">
+  <div class="modal-card">
+    <h3>Set your PIN</h3>
+    <p class="login-sub" style="text-align:left;margin:0 0 12px">Welcome! For security, please set a new PIN (4–8 digits). You'll use it to sign in next time.</p>
+    <input id="pinNew1" type="password" inputmode="numeric" maxlength="8" placeholder="New PIN">
+    <input id="pinNew2" type="password" inputmode="numeric" maxlength="8" placeholder="Confirm PIN" style="margin-top:10px">
+    <button class="btn primary block" id="pinSave" style="margin-top:14px">Save PIN</button>
+    <p class="login-hint" id="pinMsg"></p>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="seed.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
