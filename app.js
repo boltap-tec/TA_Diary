@@ -31,6 +31,65 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const ADMIN = 'arulece05@gmail.com';   // only admin may switch officers / manage users
 
+/* =========================================================
+   SUPABASE CLOUD LAYER (optional, gated by config.USE_AUTH)
+   When enabled: login uses Supabase Auth, data syncs to the
+   ta_* tables. When disabled/offline: app stays localStorage.
+   ========================================================= */
+let _sb=null;
+function sbClient(){
+  if(_sb) return _sb;
+  const c=window.TA_CONFIG||{};
+  if(window.supabase && c.SUPABASE_URL && c.SUPABASE_ANON_KEY && !/YOUR-/.test(c.SUPABASE_URL))
+    _sb=window.supabase.createClient(c.SUPABASE_URL, c.SUPABASE_ANON_KEY, {auth:{persistSession:true, storageKey:'ta_sb_auth'}});
+  return _sb;
+}
+const sbOn = () => !!(window.TA_CONFIG && window.TA_CONFIG.USE_AUTH) && !!sbClient();
+const pinToPass = pin => pin + 'Aa#tadiary';   // internal password derived from the PIN (never shown)
+
+/* row <-> app-object converters */
+const rowToEntry = r => ({id:r.id,email:r.email,today:r.today||'',leaveType:r.leave_type||'',officeFrom:r.office_from||'',officeTo:r.office_to||'',
+  fromDate:r.from_date||'',fromTime:r.from_time?String(r.from_time).slice(0,5):'',toDate:r.to_date||'',toTime:r.to_time?String(r.to_time).slice(0,5):'',
+  mode:r.mode||'',distance:+r.distance||0,fare:+r.fare||0,days:+r.days||0,trip:+r.trip||0,completed:r.completed||'',
+  diaryDetail:r.diary_detail||'',diaryShort:r.diary_short||'',taShort:r.ta_short||'',purpose:r.purpose||''});
+const entryToRow = e => ({id:e.id,email:e.email,today:e.today||'',leave_type:e.leaveType||'',office_from:e.officeFrom||'',office_to:e.officeTo||'',
+  from_date:e.fromDate||null,from_time:e.fromTime||null,to_date:e.toDate||null,to_time:e.toTime||null,mode:e.mode||'',
+  distance:+e.distance||0,fare:+e.fare||0,days:+e.days||0,trip:parseInt(e.trip)||0,completed:e.completed||'',
+  diary_detail:e.diaryDetail||'',diary_short:e.diaryShort||'',ta_short:e.taShort||'',purpose:e.purpose||''});
+const rowToVisit = r => ({id:r.id,email:r.email,date:r.date||'',office:r.office||'',pincode:r.pincode||'',ref:r.ref||'',hw:r.hw||[],sw:r.sw||[],
+  aptDtr:r.apt_dtr||'',boBal:r.bo_bal||'',disc:r.disc||'',purpose:r.purpose||'',result:r.result||''});
+const visitToRow = v => ({id:v.id,email:v.email,date:v.date||null,office:v.office||'',pincode:v.pincode||'',ref:v.ref||'',hw:v.hw||[],sw:v.sw||[],
+  apt_dtr:v.aptDtr||'',bo_bal:v.boBal||'',disc:v.disc||'',purpose:v.purpose||'',result:v.result||''});
+const rowToProfile = r => ({email:r.email,name:r.name||'',desg:r.designation||'',basic:r.basic||'',parent:r.parent_office||'',pincode:r.pincode||'',
+  daily:+r.daily_ta_fare||0,mileage:+r.mileage_fare||0,maxBike:+r.max_bike||0,submitTo:r.submit_to||'',every:r.submit_every||'Fortnight',
+  is_admin:!!r.is_admin,is_blocked:!!r.is_blocked});
+const profileToRow = p => ({email:p.email,name:p.name||'',designation:p.desg||'',basic:p.basic||'',parent_office:p.parent||'',pincode:p.pincode||'',
+  daily_ta_fare:+p.daily||0,mileage_fare:+p.mileage||0,max_bike:+p.maxBike||0,submit_to:p.submitTo||'',submit_every:p.every||'Fortnight'});
+
+/* pull this user's data (RLS returns own rows, or all for admin) + shared tables into the local cache */
+async function sbPull(){
+  const c=sbClient(); if(!c) return;
+  try{
+    const [offs, rts, profs, ents, vis] = await Promise.all([
+      c.from('ta_offices').select('*'), c.from('ta_routes').select('*'),
+      c.from('ta_profiles').select('*'), c.from('ta_entries').select('*'), c.from('ta_visits').select('*')
+    ]);
+    if(offs.data){ const m={}; offs.data.forEach(o=>m[(o.name||'').toLowerCase()]=o.pincode); (window.TA_SEED=window.TA_SEED||{}).officePins=m; }
+    if(rts.data){ const m={}; rts.data.forEach(r=>m[(r.office_from||'').toLowerCase()+'||'+(r.office_to||'').toLowerCase()]={d:+r.distance||0,f:+r.fare||0}); (window.TA_SEED=window.TA_SEED||{}).routes=m; }
+    if(profs.data && profs.data.length) DB.profiles = profs.data.map(rowToProfile);
+    if(ents.data) DB.allE = ents.data.map(rowToEntry);
+    if(vis.data)  DB.allV = vis.data.map(rowToVisit);
+  }catch(e){ console.warn('sbPull failed (using cached data):', e.message); }
+}
+/* best-effort writes */
+async function sbUpsertEntry(e){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_entries').upsert(entryToRow(e)); }catch(err){ console.warn('entry sync',err.message); } }
+async function sbDeleteEntry(id){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_entries').delete().eq('id',id); }catch(err){} }
+async function sbUpsertVisit(v){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_visits').upsert(visitToRow(v)); }catch(err){ console.warn('visit sync',err.message); } }
+async function sbDeleteVisit(id){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_visits').delete().eq('id',id); }catch(err){} }
+async function sbUpsertProfile(p){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').upsert(profileToRow(p)); }catch(err){ console.warn('profile sync',err.message); } }
+async function sbSetBlocked(email,val){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').update({is_blocked:val}).eq('email',email); }catch(err){} }
+async function sbDeleteProfile(email){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').delete().eq('email',email); }catch(err){} }
+
 /* ---------------- PIN / login / access ---------------- */
 const getPin = email => (LS.get('ta_pins', {})[email]) || '1234';
 const setPin = (email, pin) => { const m = LS.get('ta_pins', {}); m[email] = pin; LS.set('ta_pins', m); };
@@ -46,25 +105,46 @@ function showLogin(){
   $('#loginView').classList.add('open');
 }
 let pendingLoginEmail=null;
-function doLogin(){
+async function doLogin(){
   const email=$('#loginEmail').value.trim().toLowerCase();
   const pin=$('#loginPin').value.trim();
+  if(!email||!pin){ loginErr('Enter your email and PIN.'); return; }
+
+  /* ----- Cloud mode: Supabase Auth ----- */
+  if(sbOn()){
+    loginErr('Signing in…'); $('#loginMsg').classList.remove('err');
+    try{
+      const { data, error } = await sbClient().auth.signInWithPassword({ email, password: pinToPass(pin) });
+      if(error){ loginErr('Incorrect email or PIN. (First-time PIN is 1234)'); return; }
+      DB.active=email; localStorage.setItem('ta_session',email);
+      await sbPull();
+      if(!(data.user.user_metadata && data.user.user_metadata.pin_set)){ pendingLoginEmail=email; showPinModal(); return; }
+      finishLoginUI();
+    }catch(e){ loginErr('Network error — check your connection and try again.'); }
+    return;
+  }
+
+  /* ----- Local mode (default): per-device PIN ----- */
   const prof=DB.profiles.find(p=>p.email.toLowerCase()===email);
   if(!prof){ loginErr('No profile found for that email.'); return; }
   if(isBlocked(prof.email)){ loginErr('This account has been blocked. Please contact the admin.'); return; }
   if(pin!==getPin(prof.email)){ loginErr('Incorrect PIN. (Default is 1234)'); return; }
-  if(!pinIsSet(prof.email)){ pendingLoginEmail=prof.email; showPinModal(); return; }  // first-time: force new PIN
+  if(!pinIsSet(prof.email)){ pendingLoginEmail=prof.email; showPinModal(); return; }
   finishLogin(prof.email);
+}
+function finishLoginUI(){
+  $('#loginView').classList.remove('open'); $('#loginPin').value='';
+  renderHeader(); go('home'); toast('Welcome, '+(DB.p?.name||''));
 }
 function finishLogin(email){
   DB.active=email; localStorage.setItem('ta_session',email);
-  $('#loginView').classList.remove('open'); $('#loginPin').value='';
-  renderHeader(); go('home'); toast('Welcome, '+(DB.p?.name||''));
+  finishLoginUI();
 }
 function loginErr(m){ const el=$('#loginMsg'); el.textContent=m; el.classList.add('err'); }
 function showPinModal(){ $('#pinNew1').value=''; $('#pinNew2').value=''; $('#pinMsg').textContent=''; $('#pinModal').classList.add('open'); }
 function logout(){
   localStorage.removeItem('ta_session');          // end session; data & PINs are kept
+  if(sbOn()){ try{ sbClient().auth.signOut(); }catch(e){} }
   ['#menuModal','#settingsModal','#sheet','#userModal','#pinModal'].forEach(s=>$(s)&&$(s).classList.remove('open'));
   $('#loginEmail').value=''; $('#loginPin').value='';
   showLogin();
@@ -312,7 +392,7 @@ function renderEntryCard(e){
 function bindCardActions(box){
   $$('[data-edit]',box).forEach(b=>b.onclick=()=>{ editingId=b.dataset.edit; go('entry'); loadEntryForm(b.dataset.edit); });
   $$('[data-del]',box).forEach(b=>b.onclick=()=>{
-    if(confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==b.dataset.del); toast('Entry deleted'); renderHome(); }
+    if(confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==b.dataset.del); sbDeleteEntry(b.dataset.del); toast('Entry deleted'); renderHome(); }
   });
 }
 $$('#homeFilter button').forEach(b=>b.onclick=()=>{
@@ -496,7 +576,7 @@ function loadEntryForm(id){
   $('#entryContext').classList.remove('show'); showFromDay();
 }
 $('#btnDeleteEntry').onclick=()=>{
-  if(editingId && confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==editingId); editingId=null; toast('Entry deleted'); go('home'); }
+  if(editingId && confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==editingId); sbDeleteEntry(editingId); editingId=null; toast('Entry deleted'); go('home'); }
 };
 
 $('#btnSaveEntry').onclick=()=>{
@@ -536,6 +616,7 @@ $('#btnSaveEntry').onclick=()=>{
     e.completed = toHQ ? 'Yes' : $('#fCompleted').value;
   }
   const arr=DB.allE.filter(x=>x.id!==e.id); arr.push(e); DB.allE=arr;
+  sbUpsertEntry(e);
   toast(editingId?'Entry updated ✓':'Entry saved ✓'); editingId=null; go('home');
 };
 $('#btnCancelEntry').onclick=()=>{ editingId=null; go('home'); };
@@ -593,7 +674,7 @@ $('#btnSaveProfile').onclick=()=>{
     submitTo:$('#pSubmitTo').value.trim(), every:$('#pEvery').value,
   };
   if(!p.name){ toast('Please enter a name'); return; }
-  DB.saveProfile(p); renderHeader(); toast('Profile saved ✓'); go('home');
+  DB.saveProfile(p); sbUpsertProfile(p); renderHeader(); toast('Profile saved ✓'); go('home');
 };
 
 /* =========================================================
@@ -912,7 +993,7 @@ function renderVisits(){
       <button class="mini del" data-vdel="${v.id}">Delete</button></div></div>`).join('')
     : `<div class="empty"><div class="big">🖥️</div>No visit reports yet.</div>`;
   $$('#visitList [data-vprint]').forEach(b=>b.onclick=()=>{ const v=DB.allV.find(x=>x.id===b.dataset.vprint); openSheet('Visit Report', docVisit(v)); });
-  $$('#visitList [data-vdel]').forEach(b=>b.onclick=()=>{ if(confirm('Delete this visit report?')){ DB.allV=DB.allV.filter(x=>x.id!==b.dataset.vdel); renderVisits(); toast('Deleted'); } });
+  $$('#visitList [data-vdel]').forEach(b=>b.onclick=()=>{ if(confirm('Delete this visit report?')){ DB.allV=DB.allV.filter(x=>x.id!==b.dataset.vdel); sbDeleteVisit(b.dataset.vdel); renderVisits(); toast('Deleted'); } });
 }
 $('#btnSaveVisit').onclick=()=>{
   if(!DB.p){ toast('Select an officer first'); return; }
@@ -922,7 +1003,7 @@ $('#btnSaveVisit').onclick=()=>{
     purpose:$('#vPurpose').value.trim(), result:$('#vResult').value.trim(),
     hw:getHW().map((_,i)=>$(`[data-vf="hw${i}"]`)?.value||''), sw:getSW().map((_,i)=>$(`[data-vf="sw${i}"]`)?.value||'') };
   if(!v.office){ toast('Enter office name'); return; }
-  const arr=DB.allV; arr.push(v); DB.allV=arr;
+  const arr=DB.allV; arr.push(v); DB.allV=arr; sbUpsertVisit(v);
   $('#vOffice').value=''; $('#vPincode').value=''; $('#vPurpose').value=''; $('#vResult').value=''; $('#vRef').value='';
   toast('Visit report saved ✓'); renderVisits(); openSheet('Visit Report', docVisit(v));
 };
@@ -1034,7 +1115,7 @@ function renderAdminSettings(){
 $('#setAddHw').onclick=()=>{ const v=$('#setNewHw').value.trim(); if(!v)return; const a=LS.get('ta_hw_extra',[]); a.push(v); LS.set('ta_hw_extra',a); $('#setNewHw').value=''; renderAdminSettings(); buildVisitControls(); toast('Hardware module added'); };
 $('#setAddSw').onclick=()=>{ const v=$('#setNewSw').value.trim(); if(!v)return; const a=LS.get('ta_sw_extra',[]); a.push(v); LS.set('ta_sw_extra',a); $('#setNewSw').value=''; renderAdminSettings(); buildVisitControls(); toast('Software module added'); };
 $('#setResetPin').onclick=()=>{ const em=$('#setResetUser').value; if(!em)return; setPin(em,'1234'); clearPinSet(em); toast('PIN reset to 1234 (user must set new on next login)'); };
-function toggleBlock(email){ const a=LS.get('ta_blocked',[]); const i=a.indexOf(email); if(i>=0)a.splice(i,1); else a.push(email); LS.set('ta_blocked',a); renderAdminSettings(); toast('User '+(i>=0?'unblocked':'blocked')); }
+function toggleBlock(email){ const a=LS.get('ta_blocked',[]); const i=a.indexOf(email); if(i>=0)a.splice(i,1); else a.push(email); LS.set('ta_blocked',a); sbSetBlocked(email,i<0); renderAdminSettings(); toast('User '+(i>=0?'unblocked':'blocked')); }
 function removeUser(email){
   const prof=DB.profiles.find(p=>p.email===email);
   if(!confirm(`Remove ${prof?.name||email} and ALL their entries & visit reports? This cannot be undone.`)) return;
@@ -1043,16 +1124,25 @@ function removeUser(email){
   DB.allV=DB.allV.filter(v=>v.email!==email);
   LS.set('ta_blocked',LS.get('ta_blocked',[]).filter(x=>x!==email));
   const pm=LS.get('ta_pins',{}); delete pm[email]; LS.set('ta_pins',pm);
-  clearPinSet(email);
+  clearPinSet(email); sbDeleteProfile(email);
   renderAdminSettings(); toast('User removed');
 }
 
 /* ---- First-time / forced PIN change ---- */
-$('#pinSave').onclick=()=>{
+$('#pinSave').onclick=async ()=>{
   const a=$('#pinNew1').value.trim(), b=$('#pinNew2').value.trim();
   if(!/^\d{4,8}$/.test(a)){ $('#pinMsg').textContent='PIN must be 4–8 digits.'; return; }
   if(a!==b){ $('#pinMsg').textContent='The two PINs do not match.'; return; }
   const email=pendingLoginEmail || DB.active;
+  if(sbOn()){
+    try{
+      const {error}=await sbClient().auth.updateUser({ password:pinToPass(a), data:{pin_set:true} });
+      if(error){ $('#pinMsg').textContent='Could not set PIN: '+error.message; return; }
+    }catch(e){ $('#pinMsg').textContent='Network error. Please try again.'; return; }
+    $('#pinModal').classList.remove('open');
+    if(pendingLoginEmail){ pendingLoginEmail=null; finishLoginUI(); } else toast('PIN updated ✓');
+    return;
+  }
   setPin(email,a); markPinSet(email);
   $('#pinModal').classList.remove('open');
   if(pendingLoginEmail){ const em=pendingLoginEmail; pendingLoginEmail=null; finishLogin(em); }
@@ -1154,10 +1244,26 @@ function loadSeed(force){
   else{ $('#rpFrom').value=iso(y,m,16); $('#rpTo').value=iso(y,m+1,0); }
   $('#rpQuick button[data-q="thisFN"]').classList.add('active');
   buildVisitControls();
+  renderHeader(); renderHome();
 
-  // login gate
+  // ----- Cloud mode: restore Supabase session if present -----
+  if(sbOn()){
+    showLogin();
+    sbClient().auth.getSession().then(async ({data})=>{
+      const s=data && data.session;
+      if(s && s.user){
+        DB.active=s.user.email; localStorage.setItem('ta_session',s.user.email);
+        await sbPull();
+        if(!(s.user.user_metadata && s.user.user_metadata.pin_set)){ pendingLoginEmail=s.user.email; showPinModal(); }
+        else finishLoginUI();
+      }
+    }).catch(()=>{});
+    return;
+  }
+
+  // ----- Local mode: per-device PIN gate -----
   const session=localStorage.getItem('ta_session');
   const valid = session && DB.profiles.some(p=>p.email===session) && !isBlocked(session) && pinIsSet(session);
-  if(valid){ DB.active=session; renderHeader(); renderHome(); }
-  else { localStorage.removeItem('ta_session'); showLogin(); renderHeader(); renderHome(); }
+  if(valid){ DB.active=session; renderHome(); }
+  else { localStorage.removeItem('ta_session'); showLogin(); }
 })();

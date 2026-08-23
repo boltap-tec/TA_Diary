@@ -13,5 +13,9 @@
    ============================================================ */
 window.TA_CONFIG = {
   SUPABASE_URL: "https://YOUR-PROJECT-REF.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR-ANON-PUBLIC-KEY"
+  SUPABASE_ANON_KEY: "YOUR-ANON-PUBLIC-KEY",
+  // Turn ON cloud login only AFTER you have: run schema.sql + seed.sql,
+  // and created the Auth users (scripts/create_auth_users.mjs).
+  // Until then leave false — the app uses the local per-device PIN login.
+  USE_AUTH: false
 };

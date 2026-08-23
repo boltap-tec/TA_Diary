@@ -34,6 +34,24 @@ This is a static app, so Supabase keys are injected at **build time** into `conf
 
 Local dev: `cp config.example.js config.js` and fill in your values (git-ignored).
 
+## Cloud login & sync (Supabase) — optional
+The app runs on local per-device PINs by default. To switch to **cloud accounts** (login works across devices, admin-resettable, data synced), do this once:
+
+1. **Create tables** — Supabase → SQL Editor → run `supabase/schema.sql` (all objects are prefixed `ta_`).
+2. **Load data** — run `supabase/seed.sql` (14 officers, 832 entries, etc.).
+3. **Create logins** — locally, with your service key (kept secret, never committed):
+   ```bash
+   SUPABASE_URL="https://YOUR-REF.supabase.co" \
+   SUPABASE_SERVICE_ROLE_KEY="your-service_role-key" \
+   node scripts/create_auth_users.mjs
+   ```
+   Every officer gets default PIN **1234** and is asked to set their own on first login.
+4. **Turn it on** — Vercel → Settings → Environment Variables → add `USE_SUPABASE_AUTH = 1` → **Redeploy**.
+
+Now login uses Supabase Auth (the PIN is the account password, stored in Supabase — not on the device), and entries/visits sync to the `ta_*` tables. Admin can reset a PIN from Supabase → Authentication → Users. Set `USE_SUPABASE_AUTH` back to empty to return to local mode.
+
+Note: cloud login needs internet; once signed in, cached data still shows offline.
+
 ## Files
 - `index.html` / `styles.css` / `app.js` — the app
 - `seed.js` — sample data (generated from the AppSheet Excel export)

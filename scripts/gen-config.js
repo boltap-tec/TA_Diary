@@ -6,6 +6,8 @@ const fs = require('fs');
 const cfg = {
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
+  // Set Vercel env var USE_SUPABASE_AUTH=1 to switch the app to cloud login.
+  USE_AUTH: /^(1|true|yes)$/i.test(process.env.USE_SUPABASE_AUTH || ''),
 };
 
 fs.writeFileSync('config.js', 'window.TA_CONFIG = ' + JSON.stringify(cfg, null, 2) + ';\n');
