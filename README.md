@@ -21,6 +21,19 @@ python -m http.server 8891
 ```
 Then open http://localhost:8891
 
+## Deploy on Vercel (with Supabase env vars)
+This is a static app, so Supabase keys are injected at **build time** into `config.js`.
+
+1. Vercel → **Add New → Project** → import `boltap-tec/TA_Diary`.
+2. **Framework Preset:** Other. (`vercel.json` already sets build command `node scripts/gen-config.js` and output `.`)
+3. **Settings → Environment Variables** — add for Production **and** Preview:
+   - `SUPABASE_URL` = `https://YOUR-PROJECT-REF.supabase.co`
+   - `SUPABASE_ANON_KEY` = your project's **anon / public** key
+   - ⚠ Do **not** add the `service_role` key — it must never reach the browser.
+4. **Deploy.** Each build regenerates `config.js` from the env vars; the app reads `window.TA_CONFIG`.
+
+Local dev: `cp config.example.js config.js` and fill in your values (git-ignored).
+
 ## Files
 - `index.html` / `styles.css` / `app.js` — the app
 - `seed.js` — sample data (generated from the AppSheet Excel export)

@@ -1,0 +1,10 @@
+{
+  "name": "ta-diary",
+  "version": "1.0.0",
+  "description": "Offline TA bill & tour diary web app (India Post field officers)",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/gen-config.js",
+    "start": "python -m http.server 8891"
+  }
+}
