@@ -368,3 +368,8 @@ textarea{resize:vertical}
 /* ---------- PIN inputs: mask visually but avoid password-manager autofill ---------- */
 input.pinmask{ -webkit-text-security:disc; text-security:disc; letter-spacing:3px; }
 input.pinmask::placeholder{ -webkit-text-security:none; text-security:none; letter-spacing:normal; }
+
+/* ---------- Login "Forgot PIN?" link ---------- */
+.link-btn{background:none;border:none;color:var(--brand);font-weight:700;font-size:13px;
+  margin-top:12px;width:100%;padding:6px;cursor:pointer}
+.link-btn:active{opacity:.7}

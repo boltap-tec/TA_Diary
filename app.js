@@ -1089,6 +1089,17 @@ $('#ocrFile').onchange=async(ev)=>{
 /* ---- Login ---- */
 $('#loginBtn').onclick=doLogin;
 $('#loginPin').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+$('#forgotPin').onclick=()=>{
+  const email=$('#loginEmail').value.trim().toLowerCase();
+  const prof=DB.profiles.find(p=>p.email.toLowerCase()===email);
+  if(!prof){ loginErr('Type your email above first, then tap “Forgot PIN?”.'); return; }
+  if(isBlocked(prof.email)){ loginErr('This account is blocked. Contact the admin.'); return; }
+  if(!confirm('Reset the PIN for '+prof.email+' back to 1234 on this device?')) return;
+  setPin(prof.email,'1234'); clearPinSet(prof.email);
+  const el=$('#loginMsg'); el.classList.remove('err');
+  el.innerHTML='PIN reset to <b>1234</b>. Sign in — you will set a new PIN.';
+  $('#loginPin').value='1234'; $('#loginPin').focus();
+};
 $('#miExport').onclick=()=>{
   const data={profiles:DB.profiles,active:DB.active,entries:DB.allE,visits:DB.allV,exported:new Date().toISOString()};
   const a=document.createElement('a');
