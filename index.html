@@ -146,12 +146,13 @@
       <div class="grid3" id="wrapMode">
         <div class="field">
           <label>Mode</label>
-          <input type="text" id="fMode" list="modeList" placeholder="Bike / Bus / Custom…">
-          <datalist id="modeList">
-            <option value="Bike"></option><option value="Bus"></option><option value="Train"></option>
-            <option value="Auto"></option><option value="Jeep"></option><option value="Car"></option>
-            <option value="Walk"></option><option value="Other"></option>
-          </datalist>
+          <select id="fMode">
+            <option value="">— select —</option>
+            <option>Bike</option><option>Bus</option><option>Train</option>
+            <option>Auto</option><option>Jeep</option><option>Car</option><option>Walk</option>
+            <option value="__custom">Other (type)…</option>
+          </select>
+          <input type="text" id="fModeCustom" placeholder="Type mode" style="display:none;margin-top:8px">
         </div>
         <div class="field" id="wrapDistance">
           <label>Distance (km) <span class="mini-hint" id="dfHint"></span></label>

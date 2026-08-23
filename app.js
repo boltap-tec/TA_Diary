@@ -411,7 +411,7 @@ function resetEntryForm(){
   $('#fOfficeTo').value=''; $('#fFromTime').value=''; $('#fToTime').value='';
   $('#fDistance').value=''; $('#fFare').value='';
   $('#fDiaryDetail').value=''; $('#fDiaryShort').value=''; $('#fTaShort').value='';
-  $('#fMode').value=''; $('#fDays').value=''; delete $('#fDays').dataset.touched; $('#fLeaveType').value='Leave (CL)';
+  setModeValue(''); $('#fDays').value=''; delete $('#fDays').dataset.touched; $('#fLeaveType').value='Leave (CL)';
   $('#fCompleted').value='No'; $('#dfHint').textContent='';
   curToday=ctx.autoToday||'Outside';
   setToday(curToday);
@@ -447,11 +447,22 @@ function updateDaysVisibility(){
   const show = isField(curToday) && $('#fCompleted').value==='Yes';
   $('#wrapDays').style.display = show ? 'block' : 'none';
 }
-function updateModeFare(){
-  const m=$('#fMode').value.trim().toLowerCase();
-  $('#wrapFare').style.display = (m==='bike'||m==='walk') ? 'none' : 'block';   // bike uses mileage, no fare
+function getMode(){ const v=$('#fMode').value; return v==='__custom' ? $('#fModeCustom').value.trim() : v; }
+function setModeValue(m){
+  const sel=$('#fMode'), opts=[...sel.options].map(o=>o.value);
+  if(m && opts.includes(m)){ sel.value=m; $('#fModeCustom').value=''; $('#fModeCustom').style.display='none'; }
+  else if(m){ sel.value='__custom'; $('#fModeCustom').value=m; $('#fModeCustom').style.display='block'; }
+  else { sel.value=''; $('#fModeCustom').value=''; $('#fModeCustom').style.display='none'; }
 }
-$('#fMode').addEventListener('input',()=>{ updateModeFare(); autofillDF(); });
+function updateModeFare(){
+  const m=getMode().toLowerCase();
+  $('#wrapFare').style.display = (m==='bike'||m==='walk') ? 'none' : 'block';   // bike/walk: mileage, no fare
+}
+$('#fMode').addEventListener('change',()=>{
+  $('#fModeCustom').style.display = $('#fMode').value==='__custom' ? 'block' : 'none';
+  updateModeFare();
+});
+$('#fModeCustom').addEventListener('input',updateModeFare);
 $('#fCompleted').addEventListener('change',()=>{ updateDaysVisibility(); updateComplete(); });
 
 function autofillDF(){
@@ -468,7 +479,6 @@ function autofillDF(){
   if(rev){
     if(!$('#fDistance').value && rev.distance) $('#fDistance').value=rev.distance;
     if(!$('#fFare').value && rev.fare) $('#fFare').value=rev.fare;
-    if(!$('#fMode').value && rev.mode){ $('#fMode').value=rev.mode; updateModeFare(); }
     $('#dfHint').textContent = `↺ same-day return: ${rev.distance||0}km${rev.fare?(' ₹'+rev.fare):''}`;
     return;
   }
@@ -490,7 +500,6 @@ function autofillDF(){
   const r=matches[0];
   if(!$('#fDistance').value && r.distance) $('#fDistance').value=r.distance;
   if(!$('#fFare').value && r.fare) $('#fFare').value=r.fare;
-  if(!$('#fMode').value && r.mode){ $('#fMode').value=r.mode; updateModeFare(); }
   $('#dfHint').textContent = `↺ ${r.distance||0}km${r.fare?(' ₹'+r.fare):''}`;
 }
 ['#fOfficeFrom','#fOfficeTo'].forEach(s=>$(s).addEventListener('input',()=>{ updateComplete(); autofillDF(); }));
@@ -564,7 +573,7 @@ function loadEntryForm(id){
   $('#fOfficeFrom').value=e.officeFrom||''; $('#fOfficeTo').value=e.officeTo||'';
   $('#fFromDate').value=e.fromDate||''; $('#fFromTime').value=e.fromTime||'';
   $('#fToDate').value=e.toDate||''; $('#fToTime').value=e.toTime||'';
-  $('#fMode').value=e.mode||''; $('#fDistance').value=e.distance||'';
+  setModeValue(e.mode||''); $('#fDistance').value=e.distance||'';
   $('#fFare').value=e.fare||'';
   $('#fDiaryDetail').value=e.diaryDetail||e.purpose||'';
   $('#fDiaryShort').value=e.diaryShort||'';
@@ -584,7 +593,7 @@ $('#btnSaveEntry').onclick=()=>{
   const leave=isLeave(curToday), holiday=curToday==='Holiday', office=isOffice(curToday);
   const leaveTypeVal = $('#fLeaveType').value.trim() || 'Leave';
   const today = leave ? 'Leave' : curToday;   // canonical category; custom label kept in leaveType
-  const mode = office ? '' : $('#fMode').value.trim();
+  const mode = office ? '' : getMode();
   const isBike = mode.toLowerCase()==='bike' || mode.toLowerCase()==='walk';
   const completedVal = office ? 'Yes' : $('#fCompleted').value;
   const diaryDetail = $('#fDiaryDetail').value.trim();
@@ -627,10 +636,6 @@ function buildOfficeDatalist(){
   if(DB.p?.parent && !offices.includes(DB.p.parent)) offices.push(DB.p.parent);
   $('#officeList').innerHTML = offices.map(o=>`<option value="${esc(o)}">`).join('');
 
-  const std=['Bike','Bus','Train','Auto','Jeep','Car','Walk','Other'];
-  const usedModes = uniq(recent.map(e=>e.mode));
-  const modes = usedModes.concat(std.filter(m=>!usedModes.some(u=>u.toLowerCase()===m.toLowerCase())));
-  $('#modeList').innerHTML = modes.map(m=>`<option value="${esc(m)}">`).join('');
 
   // suggestions from THIS user's previously saved entries (recent first)
   const dl=$('#shortList'), tl=$('#taShortList'), ds=$('#diaryDetailSug');
@@ -1198,19 +1203,46 @@ $('#sheetWord').onclick=()=>{
 function ensureTesseract(){ return new Promise((res,rej)=>{ if(window.Tesseract) return res();
   const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
   s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+// shrink large photos before OCR — a full-res phone photo is very slow to scan
+function downscaleImage(file, maxDim){
+  return new Promise(resolve=>{
+    const url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1, maxDim/Math.max(img.width,img.height));
+      const w=Math.max(1,Math.round(img.width*scale)), h=Math.max(1,Math.round(img.height*scale));
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=>resolve(b||file),'image/jpeg',0.85);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); resolve(file); };
+    img.src=url;
+  });
+}
+let _ocrWorker=null;
+async function ocrWorker(st){
+  await ensureTesseract();
+  if(_ocrWorker) return _ocrWorker;                 // reuse across scans (much faster after the first)
+  st.textContent='Loading OCR engine (one-time)…';
+  _ocrWorker=await Tesseract.createWorker('eng',1,{logger:m=>{
+    if(m.status==='recognizing text') st.textContent='Scanning… '+Math.round(m.progress*100)+'%';
+  }});
+  return _ocrWorker;
+}
 $('#ocrBtn').onclick=()=>$('#ocrFile').click();
 $('#ocrFile').onchange=async(ev)=>{
-  const f=ev.target.files[0]; if(!f) return; const st=$('#ocrStatus');
-  st.textContent='Loading OCR engine…';
+  const f=ev.target.files[0]; if(!f) return; const st=$('#ocrStatus'); const btn=$('#ocrBtn');
+  btn.disabled=true; st.textContent='Preparing image…';
   try{
-    await ensureTesseract();
-    st.textContent='Scanning… 0%';
-    const {data}=await Tesseract.recognize(f,'eng',{logger:m=>{ if(m.status==='recognizing text') st.textContent='Scanning… '+Math.round(m.progress*100)+'%'; }});
-    const txt=(data.text||'').replace(/\n{2,}/g,'\n').trim();
-    const box=$('#fDiaryDetail'); box.value=(box.value?box.value+'\n':'')+txt;
-    st.textContent='✓ Added text from image ('+txt.length+' chars)';
-  }catch(e){ st.textContent='⚠ OCR needs internet to load the first time. Please connect and retry.'; }
-  ev.target.value='';
+    const img=await downscaleImage(f,1500);
+    const w=await ocrWorker(st);
+    st.textContent='Scanning…';
+    const {data}=await w.recognize(img);
+    const txt=(data.text||'').replace(/[ \t]+\n/g,'\n').replace(/\n{2,}/g,'\n').trim();
+    if(!txt){ st.textContent='No readable text found — try a clearer, well-lit, straight photo.'; }
+    else{ const box=$('#fDiaryDetail'); box.value=(box.value?box.value.trim()+'\n':'')+txt; st.textContent='✓ Added '+txt.length+' characters.'; }
+  }catch(e){ st.textContent='⚠ OCR failed — it needs internet the first time. Please retry online.'; }
+  btn.disabled=false; ev.target.value='';
 };
 
 /* ---- Login ---- */
