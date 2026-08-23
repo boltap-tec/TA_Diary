@@ -784,14 +784,15 @@ function docTA(){
   const gross=t.amount+hotel;
   const net=gross-advance;
   const rows=es.map(e=>`<tr>
-    <td class="dtcell">${fmtDate(e.fromDate)}<br>${fmtTime24(e.fromTime)}–${fmtTime24(e.toTime)}</td>
+    <td class="dtcell">${fmtDate(e.fromDate)}<br>${fmtTime24(e.fromTime)}</td>
     <td>${esc(e.officeFrom)}</td>
+    <td class="dtcell">${fmtDate(e.toDate)}<br>${fmtTime24(e.toTime)}</td>
     <td>${esc(e.officeTo)}</td>
     <td class="center">${esc(e.mode)}</td>
     <td class="num">${(+e.distance||0)?(+e.distance).toFixed(2):''}</td>
     <td class="num">${(+e.fare||0)?(+e.fare).toFixed(2):''}</td>
     <td class="center">${(+e.days||0)?(+e.days).toFixed(2):''}</td>
-    <td>${esc(e.taShort||e.diaryShort||e.purpose)}</td></tr>`).join('') || `<tr><td colspan="8" class="center muted">No journeys in this period</td></tr>`;
+    <td>${esc(e.taShort||e.diaryShort||e.purpose)}</td></tr>`).join('') || `<tr><td colspan="9" class="center muted">No journeys in this period</td></tr>`;
   const words=numWords(Math.round(net));
   const dailyWords=numWords(Math.round(t.daily));
 
@@ -808,15 +809,15 @@ function docTA(){
     <div class="kv">4. Headquarters &nbsp;: <b>${esc(p.parent)} - ${esc(p.pincode)}</b></div>
     <div class="kv">5. Details and purposes of Journey(s) performed &nbsp; <b>${periodLabel()}</b></div>
     <table>
-      <colgroup><col style="width:14%"><col style="width:17%"><col style="width:17%"><col style="width:8%">
-        <col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:22%"></colgroup>
+      <colgroup><col style="width:10%"><col style="width:15%"><col style="width:10%"><col style="width:15%"><col style="width:7%">
+        <col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:23%"></colgroup>
       <thead>
-        <tr><th>-1</th><th>-2</th><th>-3</th><th>-4</th><th>-5</th><th>-6</th><th>-7</th><th>-8</th></tr>
-        <tr><th>Date &amp; Time</th><th>From Office/Place</th><th>To Office/Place</th>
+        <tr><th>-1</th><th>-2</th><th>-3</th><th>-4</th><th>-5</th><th>-6</th><th>-7</th><th>-8</th><th>-9</th></tr>
+        <tr><th>Date &amp; Time From</th><th>From Office/Place</th><th>Date &amp; Time To</th><th>To Office/Place</th>
             <th>Mode</th><th>Dist (Km)</th><th>Fare (Rs)</th><th>Days</th><th>Purpose of Journey</th></tr>
       </thead>
       <tbody>${rows}
-        <tr class="tot"><td class="right" colspan="4">Total ${t.bikeDist.toFixed(0)} Kms by Bike</td>
+        <tr class="tot"><td class="right" colspan="5">Total ${t.bikeDist.toFixed(0)} Kms by Bike</td>
           <td class="num">${t.bikeDist.toFixed(0)}</td><td class="num">${t.fare.toFixed(2)}</td>
           <td class="center">${t.days.toFixed(2)}</td><td></td></tr>
       </tbody>
