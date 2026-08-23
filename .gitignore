@@ -2,3 +2,8 @@ scratchpad/
 *.log
 .DS_Store
 Thumbs.db
+
+# local secrets / config (never commit)
+config.js
+.env
+.env.*
