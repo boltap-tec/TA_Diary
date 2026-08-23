@@ -13,7 +13,8 @@ create extension if not exists pgcrypto;
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at,
-  raw_app_meta_data, raw_user_meta_data, is_super_admin
+  raw_app_meta_data, raw_user_meta_data, is_super_admin,
+  confirmation_token, recovery_token, email_change, email_change_token_new
 )
 select
   '00000000-0000-0000-0000-000000000000',
@@ -24,7 +25,8 @@ select
   now(), now(), now(),
   '{"provider":"email","providers":["email"]}'::jsonb,
   '{"pin_set":false}'::jsonb,
-  false
+  false,
+  '', '', '', ''
 from ta_profiles p
 where not exists (select 1 from auth.users u where lower(u.email) = lower(p.email));
 
