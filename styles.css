@@ -325,6 +325,7 @@ textarea{resize:vertical}
   .sheet-body{padding:0;display:block}
   .doc{box-shadow:none;width:auto;padding:0;font-size:11.5px;page-break-after:always}
   .doc:last-child{page-break-after:auto}
+  tr,thead,.sign,ol,table{page-break-inside:avoid}   /* keep rows/blocks whole — no half pages */
   @page{size:A4;margin:12mm}
 }
 @media (max-width:430px){

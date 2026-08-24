@@ -880,8 +880,11 @@ function docTA(){
     <div class="sign"><span>Counter signed</span><span>Signature of Controlling Officer</span></div>
   </div>`;
 
-  const foodFrom = es.length? fmtDate(es[0].fromDate):periodLabel();
-  const foodTo   = es.length? fmtDate(es[es.length-1].toDate||es[es.length-1].fromDate):'';
+  // Food-bill tour dates follow the selected report filter (From / To), not the
+  // saved travel entries. Fall back to entry dates only when no filter is set (All).
+  const rng = getRange();
+  const foodFrom = rng.from ? fmtDate(rng.from) : (es.length? fmtDate(es[0].fromDate):'');
+  const foodTo   = rng.to   ? fmtDate(rng.to)   : (es.length? fmtDate(es[es.length-1].toDate||es[es.length-1].fromDate):'');
   const page3=`<div class="doc">
     <h2>ANNEXURE — 'B'</h2>
     <div class="center" style="font-weight:700;margin-bottom:10px">Expenditure incurred on account of Food bills during tour.</div>
@@ -1068,44 +1071,92 @@ function docVisit(v){
    ========================================================= */
 function openSheet(title,html){ $('#sheetTitle').textContent=title; $('#sheetBody').innerHTML=html; $('#sheet').classList.add('open'); }
 $('#sheetClose').onclick=()=>$('#sheet').classList.remove('open');
-$('#sheetPrint').onclick=()=>window.print();
 
-/* ---- Report export / share (used for TA Bill, Tour Diary, Visit Report) ---- */
+/* =========================================================
+   Report export / share — works in the browser AND in the
+   Android APK (Capacitor). In a native WebView an <a download>
+   is ignored, so files are saved/shared through the native
+   Filesystem + Share plugins instead.
+   ========================================================= */
+const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const capPlugin = name => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null;
 function reportFilename(){ return ($('#sheetTitle').textContent||'report').replace(/[^\w]+/g,'_'); }
-function reportWordHtml(){
-  return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">'
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(blob); });
+}
+
+/* ---- Word (.doc) ---- */
+function reportWordBlob(){
+  const html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">'
     +'<head><meta charset="utf-8"><style>'
     +'body{font-family:'+getComputedStyle(document.documentElement).getPropertyValue('--doc-font')+';}'
     +'table{border-collapse:collapse;width:100%}td,th{border:1px solid #000;padding:4px 6px;font-size:11px;vertical-align:top}'
     +'h1{font-size:15px;text-align:center}h2{font-size:13px;text-align:center}.right{text-align:right}.center{text-align:center}.num{text-align:right}'
-    +'.sign{display:flex;justify-content:space-between;margin-top:30px}</style></head><body>'
+    +'.doc{page-break-after:always}.sign{display:flex;justify-content:space-between;margin-top:30px}</style></head><body>'
     + $('#sheetBody').innerHTML + '</body></html>';
+  return new Blob(['﻿'+html],{type:'application/msword'});
 }
-function reportWordFile(){
-  return new File(['﻿'+reportWordHtml()], reportFilename()+'.doc', {type:'application/msword'});
+
+/* ---- PDF (real file, one report-page per PDF page) ---- */
+function reportPdfBlob(){
+  if(!window.html2pdf) return Promise.reject(new Error('PDF engine not loaded'));
+  const opt={
+    margin:[8,8,8,8],
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+    pagebreak:{mode:['css','legacy'],before:'.doc',avoid:['tr','.sign']}
+  };
+  return window.html2pdf().set(opt).from($('#sheetBody')).outputPdf('blob');
 }
-function downloadWord(){
-  const a=document.createElement('a'); a.href=URL.createObjectURL(reportWordFile());
-  a.download=reportFilename()+'.doc'; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-}
-$('#sheetShare').onclick=async ()=>{
-  const title=$('#sheetTitle').textContent||'Report';
-  const file=reportWordFile();
-  // Prefer sharing the document itself (works on Android / most phones)
-  if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file], title}); }
-    catch(e){ if(e && e.name!=='AbortError') toast('Could not share'); }
+
+/* ---- Deliver a blob: share via the OS, or save/download ---- */
+async function deliverFile(blob, filename, share){
+  if(isNative()){
+    const Filesystem=capPlugin('Filesystem'), Share=capPlugin('Share');
+    const data=await blobToBase64(blob);
+    if(share && Share){
+      await Filesystem.writeFile({path:filename,data,directory:'CACHE',recursive:true});
+      const {uri}=await Filesystem.getUri({path:filename,directory:'CACHE'});
+      await Share.share({title:filename,url:uri});
+      return;
+    }
+    // save/download: try public Documents, fall back to cache + share sheet
+    try{
+      await Filesystem.writeFile({path:filename,data,directory:'DOCUMENTS',recursive:true});
+      toast('Saved to Documents › '+filename);
+    }catch(e){
+      await Filesystem.writeFile({path:filename,data,directory:'CACHE',recursive:true});
+      const {uri}=await Filesystem.getUri({path:filename,directory:'CACHE'});
+      if(Share){ await Share.share({title:filename,url:uri}); } else { toast('Saved: '+filename); }
+    }
     return;
   }
-  // Fallback 1: share plain text of the report
-  if(navigator.share){
-    try{ await navigator.share({title, text:($('#sheetBody').innerText||'').trim()}); return; }
-    catch(e){ if(e && e.name==='AbortError') return; }
+  // Browser: native share if asked & available, else download
+  if(share && navigator.canShare){
+    const file=new File([blob],filename,{type:blob.type});
+    if(navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:filename}); return; }catch(e){ if(e&&e.name==='AbortError') return; } }
   }
-  // Fallback 2: no share support (e.g. desktop) — save the file so it can be attached manually
-  downloadWord(); toast('Sharing not supported here — file saved so you can attach it');
-};
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  if(share) toast('Sharing not available here — file downloaded instead');
+}
+
+async function doReport(kind /* 'share-pdf' | 'save-pdf' | 'save-word' */){
+  try{
+    if(kind==='save-word'){ await deliverFile(reportWordBlob(), reportFilename()+'.doc', false); if(!isNative()) toast('Word file saved'); return; }
+    toast('Preparing PDF…');
+    const blob=await reportPdfBlob();
+    await deliverFile(blob, reportFilename()+'.pdf', kind==='share-pdf');
+  }catch(e){
+    // PDF engine unavailable → fall back to the Word document
+    await deliverFile(reportWordBlob(), reportFilename()+'.doc', kind==='share-pdf');
+    toast('PDF unavailable — used Word instead');
+  }
+}
+$('#sheetShare').onclick=()=>doReport('share-pdf');
+$('#sheetPrint').onclick=()=>doReport('save-pdf');
+$('#sheetWord').onclick =()=>doReport('save-word');
 
 $('#btnMenu').onclick=()=>$('#menuModal').classList.add('open');
 $('#miClose').onclick=()=>$('#menuModal').classList.remove('open');
@@ -1219,9 +1270,6 @@ function removeUser(email){
   sbDeleteProfile(email);
   renderAdminSettings(); toast('User removed');
 }
-
-/* ---- Word export (save) ---- */
-$('#sheetWord').onclick=()=>{ downloadWord(); toast('Word file saved'); };
 
 /* ---- OCR (Diary detail text) ---- */
 function ensureTesseract(){ return new Promise((res,rej)=>{ if(window.Tesseract) return res();
