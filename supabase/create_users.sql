@@ -8,8 +8,8 @@
 
 create extension if not exists pgcrypto;
 
--- 1) Create an auth user for each row in ta_profiles (default PIN 1234, email pre-confirmed,
---    pin_set=false so each user is asked to set their own PIN on first login).
+-- 1) Create an auth user for each row in ta_profiles (default PIN 1234, email pre-confirmed).
+--    Users are NOT forced to change the PIN; they can change it anytime in Profile if they wish.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at,

@@ -94,9 +94,6 @@ async function sbDeleteProfile(email){ const c=sbClient(); if(!sbOn()) return; t
 /* ---------------- PIN / login / access ---------------- */
 const getPin = email => (LS.get('ta_pins', {})[email]) || '1234';
 const setPin = (email, pin) => { const m = LS.get('ta_pins', {}); m[email] = pin; LS.set('ta_pins', m); };
-const pinIsSet = email => !!LS.get('ta_pinset', {})[email];
-const markPinSet = email => { const m=LS.get('ta_pinset',{}); m[email]=true; LS.set('ta_pinset',m); };
-const clearPinSet = email => { const m=LS.get('ta_pinset',{}); delete m[email]; LS.set('ta_pinset',m); };
 const isBlocked = email => (LS.get('ta_blocked', [])||[]).includes(email);
 
 function showLogin(){
@@ -105,7 +102,6 @@ function showLogin(){
   $('#loginMsg').innerHTML='Default PIN is <b>1234</b>. You can change it anytime in Profile.';
   $('#loginView').classList.add('open');
 }
-let pendingLoginEmail=null;
 async function doLogin(){
   const email=$('#loginEmail').value.trim().toLowerCase();
   const pin=$('#loginPin').value.trim();
@@ -140,11 +136,10 @@ function finishLogin(email){
   finishLoginUI();
 }
 function loginErr(m){ const el=$('#loginMsg'); el.textContent=m; el.classList.add('err'); }
-function showPinModal(){ $('#pinNew1').value=''; $('#pinNew2').value=''; $('#pinMsg').textContent=''; $('#pinModal').classList.add('open'); }
 function logout(){
   localStorage.removeItem('ta_session');          // end session; data & PINs are kept
   if(sbOn()){ try{ sbClient().auth.signOut(); }catch(e){} }
-  ['#menuModal','#settingsModal','#sheet','#userModal','#pinModal'].forEach(s=>$(s)&&$(s).classList.remove('open'));
+  ['#menuModal','#settingsModal','#sheet','#userModal'].forEach(s=>$(s)&&$(s).classList.remove('open'));
   $('#loginEmail').value=''; $('#loginPin').value='';
   showLogin();
   const el=$('#loginMsg'); el.classList.remove('err'); el.innerHTML='Signed out. Enter your email and PIN to sign in.';
@@ -1097,13 +1092,20 @@ async function changePin(newPin){
   if(!/^\d{4,8}$/.test(newPin)) return {ok:false, msg:'PIN must be 4–8 digits.'};
   if(sbOn()){
     try{
-      const {error}=await sbClient().auth.updateUser({ password:pinToPass(newPin), data:{pin_set:true} });
+      // A PIN change updates the signed-in account's password. If the admin is
+      // only *viewing* another officer (switched view), refuse — otherwise the
+      // admin's own password would be overwritten and only that person could log in.
+      const { data } = await sbClient().auth.getSession();
+      const authEmail = data && data.session && data.session.user && data.session.user.email;
+      if(authEmail && DB.active && authEmail.toLowerCase()!==DB.active.toLowerCase())
+        return {ok:false, msg:'You can only change the PIN for the officer who is signed in. Ask them to sign in and change it themselves.'};
+      const {error}=await sbClient().auth.updateUser({ password:pinToPass(newPin) });
       if(error) return {ok:false, msg:'Could not update PIN: '+error.message};
       await sbSetProfilePin(DB.active, newPin);   // keep the visible PIN column in sync
     }catch(e){ return {ok:false, msg:'Network error. Please try again.'}; }
   } else {
     if(!DB.active) return {ok:false, msg:'Sign in first.'};
-    setPin(DB.active,newPin); markPinSet(DB.active);
+    setPin(DB.active,newPin);
   }
   // update local cache so the admin list shows the new PIN immediately
   DB.profiles = DB.profiles.map(x => x.email===DB.active ? {...x, pin:newPin} : x);
@@ -1148,7 +1150,7 @@ function renderAdminSettings(){
 }
 $('#setAddHw').onclick=()=>{ const v=$('#setNewHw').value.trim(); if(!v)return; const a=LS.get('ta_hw_extra',[]); a.push(v); LS.set('ta_hw_extra',a); $('#setNewHw').value=''; renderAdminSettings(); buildVisitControls(); toast('Hardware module added'); };
 $('#setAddSw').onclick=()=>{ const v=$('#setNewSw').value.trim(); if(!v)return; const a=LS.get('ta_sw_extra',[]); a.push(v); LS.set('ta_sw_extra',a); $('#setNewSw').value=''; renderAdminSettings(); buildVisitControls(); toast('Software module added'); };
-$('#setResetPin').onclick=()=>{ const em=$('#setResetUser').value; if(!em)return; setPin(em,'1234'); clearPinSet(em); toast('PIN reset to 1234 (user must set new on next login)'); };
+$('#setResetPin').onclick=()=>{ const em=$('#setResetUser').value; if(!em)return; setPin(em,'1234'); toast('PIN reset to 1234'); };
 function toggleBlock(email){ const a=LS.get('ta_blocked',[]); const i=a.indexOf(email); if(i>=0)a.splice(i,1); else a.push(email); LS.set('ta_blocked',a); sbSetBlocked(email,i<0); renderAdminSettings(); toast('User '+(i>=0?'unblocked':'blocked')); }
 function removeUser(email){
   const prof=DB.profiles.find(p=>p.email===email);
@@ -1158,31 +1160,9 @@ function removeUser(email){
   DB.allV=DB.allV.filter(v=>v.email!==email);
   LS.set('ta_blocked',LS.get('ta_blocked',[]).filter(x=>x!==email));
   const pm=LS.get('ta_pins',{}); delete pm[email]; LS.set('ta_pins',pm);
-  clearPinSet(email); sbDeleteProfile(email);
+  sbDeleteProfile(email);
   renderAdminSettings(); toast('User removed');
 }
-
-/* ---- First-time / forced PIN change ---- */
-$('#pinSave').onclick=async ()=>{
-  const a=$('#pinNew1').value.trim(), b=$('#pinNew2').value.trim();
-  if(!/^\d{4,8}$/.test(a)){ $('#pinMsg').textContent='PIN must be 4–8 digits.'; return; }
-  if(a!==b){ $('#pinMsg').textContent='The two PINs do not match.'; return; }
-  const email=pendingLoginEmail || DB.active;
-  if(sbOn()){
-    try{
-      const {error}=await sbClient().auth.updateUser({ password:pinToPass(a), data:{pin_set:true} });
-      if(error){ $('#pinMsg').textContent='Could not set PIN: '+error.message; return; }
-      await sbSetProfilePin(email, a);   // keep the visible PIN column in sync
-    }catch(e){ $('#pinMsg').textContent='Network error. Please try again.'; return; }
-    $('#pinModal').classList.remove('open');
-    if(pendingLoginEmail){ pendingLoginEmail=null; finishLoginUI(); } else toast('PIN updated ✓');
-    return;
-  }
-  setPin(email,a); markPinSet(email);
-  $('#pinModal').classList.remove('open');
-  if(pendingLoginEmail){ const em=pendingLoginEmail; pendingLoginEmail=null; finishLogin(em); }
-  toast('PIN set ✓');
-};
 
 /* ---- Word export ---- */
 $('#sheetWord').onclick=()=>{
@@ -1308,23 +1288,9 @@ function loadSeed(force){
   buildVisitControls();
   renderHeader(); renderHome();
 
-  // ----- Cloud mode: restore Supabase session if present -----
-  if(sbOn()){
-    showLogin();
-    sbClient().auth.getSession().then(async ({data})=>{
-      const s=data && data.session;
-      if(s && s.user){
-        DB.active=s.user.email; localStorage.setItem('ta_session',s.user.email);
-        await sbPull();
-        finishLoginUI();
-      }
-    }).catch(()=>{});
-    return;
-  }
-
-  // ----- Local mode: per-device PIN gate -----
-  const session=localStorage.getItem('ta_session');
-  const valid = session && DB.profiles.some(p=>p.email===session) && !isBlocked(session);
-  if(valid){ DB.active=session; renderHome(); }
-  else { localStorage.removeItem('ta_session'); showLogin(); }
+  // ----- Always require a fresh login. No device stays bound to a person; -----
+  // ----- anyone can open the app and sign in with their email + PIN.      -----
+  localStorage.removeItem('ta_session');
+  if(sbOn()){ try{ sbClient().auth.signOut(); }catch(e){} }
+  showLogin();
 })();
