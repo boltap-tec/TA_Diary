@@ -5,6 +5,15 @@
   "private": true,
   "scripts": {
     "build": "node scripts/gen-config.js",
-    "start": "python -m http.server 8891"
+    "start": "python -m http.server 8891",
+    "copy:web": "node scripts/copy-web.mjs",
+    "apk": "node scripts/copy-web.mjs && npx cap copy android && cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/core": "^6.2.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.1"
   }
 }

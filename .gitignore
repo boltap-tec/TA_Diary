@@ -7,3 +7,11 @@ Thumbs.db
 config.js
 .env
 .env.*
+
+# node / capacitor build artifacts
+node_modules/
+www/
+android/local.properties
+
+# built apk (delivered separately, not committed)
+*.apk
