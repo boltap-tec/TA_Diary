@@ -336,7 +336,7 @@ textarea{resize:vertical}
 /* ---------- Print ---------- */
 @media print{
   body{background:#fff;padding:0}
-  .appbar,.tabbar,.sheet-bar,.no-print{display:none!important}
+  #app,.appbar,.tabbar,.sheet-bar,.no-print{display:none!important}   /* only the document sheet prints */
   .sheet{position:static;background:#fff}
   .sheet-body{padding:0;display:block}
   .sheet-body .doc{min-height:0}

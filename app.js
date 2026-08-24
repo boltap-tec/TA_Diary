@@ -979,9 +979,9 @@ function docDiary(){
 
   return `<div class="doc">
     <h2>DIARY FOR THE ${esc(diaryTitle())}</h2>
-    <div class="kv right"><b>${esc(p.name)}</b></div>
-    <div class="kv right">${esc(p.desg)}</div>
-    <div class="kv right">${esc(p.parent)} - ${esc(p.pincode)}</div>
+    <div class="kv">1. Name &nbsp;: <b>${esc(p.name)}</b></div>
+    <div class="kv">2. Designation &nbsp;: <b>${esc(p.desg)}</b></div>
+    <div class="kv">3. Headquarters &nbsp;: <b>${esc(p.parent)} - ${esc(p.pincode)}</b></div>
     <div style="font-weight:700;margin:12px 0 6px">DESCRIPTION :</div>
     <table class="desct">
       <thead><tr><th>Date</th><th>Day</th><th>Place</th><th>Details of work / journey</th></tr></thead>
@@ -998,7 +998,7 @@ function docDiary(){
       <tbody>${rows}</tbody>
     </table>
     <div class="kv" style="margin-top:14px">Submitted to : <b>${esc(p.submitTo||'—')}</b></div>
-    <div style="margin-top:26px"><b>${esc(p.name)}</b><br>${esc(p.desg)}</div>
+    <div class="right" style="margin-top:26px"><b>${esc(p.name)}</b><br>${esc(p.desg)}<br>${esc(p.parent)} - ${esc(p.pincode)}</div>
   </div>`;
 }
 
