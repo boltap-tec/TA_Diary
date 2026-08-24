@@ -70,11 +70,11 @@
       <div class="nc-cta">＋</div>
     </button>
 
-    <div class="quick quick4">
+    <div class="quick quick4" id="homeQuick">
       <button class="quick-btn" data-view="entry" id="qEntry"><span>＋</span>New</button>
       <button class="quick-btn" data-view="reports"><span>🧾</span>TA Bill</button>
       <button class="quick-btn" data-view="month"><span>📅</span>Month</button>
-      <button class="quick-btn" data-view="visit"><span>🖥️</span>Visit</button>
+      <button class="quick-btn" data-view="visit" id="qVisit"><span>🖥️</span>Visit</button>
     </div>
 
     <div class="section-head">
@@ -343,7 +343,7 @@
   <button class="tab active" data-view="home"><span>🏠</span>Home</button>
   <button class="tab" data-view="reports"><span>📄</span>Reports</button>
   <button class="tab tab-fab" data-view="entry" id="tabAdd"><span>＋</span></button>
-  <button class="tab" data-view="visit"><span>🖥️</span>Visit</button>
+  <button class="tab" data-view="visit" id="tabVisit"><span>🖥️</span>Visit</button>
   <button class="tab" data-view="profile"><span>👤</span>Profile</button>
 </nav>
 
@@ -352,6 +352,7 @@
   <div class="sheet-bar no-print">
     <button class="btn ghost" id="sheetClose">←</button>
     <div class="sheet-title" id="sheetTitle">Report</div>
+    <button class="btn ghost" id="sheetShare">📤 Share</button>
     <button class="btn ghost" id="sheetWord">⬇ Word</button>
     <button class="btn primary" id="sheetPrint">🖨 PDF</button>
   </div>
@@ -389,6 +390,9 @@
       <option value="15px">Extra large</option>
     </select>
     <div class="set-preview" id="setPreview">Preview — TA Bill &amp; Diary text 123 ₹</div>
+    <hr>
+    <label class="set-toggle"><input type="checkbox" id="setVisit"> <span>Enable Office Visit Report</span></label>
+    <p class="hint" style="margin:4px 0 0">Adds the “Visit” tab for recording office inspections. Off by default — turn on only if you need it.</p>
     <hr>
     <label class="set-label">Change PIN</label>
     <input id="setNewPin" type="text" class="pinmask" inputmode="numeric" maxlength="8" placeholder="New PIN (4-8 digits)" autocomplete="off" data-form-type="other">

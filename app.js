@@ -234,6 +234,7 @@ function computeContext(){
    ========================================================= */
 let editingId = null;
 function go(view){
+  if(view==='visit' && !visitOn(DB.active)) view='home';   // Visit is optional / off by default
   $$('.view').forEach(v=>v.classList.remove('active'));
   $('#view-'+view).classList.add('active');
   $$('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view===view));
@@ -255,12 +256,24 @@ $$('.tab, .quick-btn').forEach(t=>t.addEventListener('click',()=>{
    HEADER / USER SWITCH
    ========================================================= */
 function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?'; }
+
+/* ----- Office Visit Report is optional, per officer, OFF by default ----- */
+const visitOn = email => !!(LS.get('ta_visit_on', {})[email]);
+const setVisitOn = (email, val) => { const m = LS.get('ta_visit_on', {}); if(val) m[email]=true; else delete m[email]; LS.set('ta_visit_on', m); };
+function applyVisitVisibility(){
+  const on = visitOn(DB.active);
+  ['#tabVisit','#qVisit','[data-r="visit"]'].forEach(s=>{ const el=$(s); if(el) el.style.display = on?'':'none'; });
+  const q=$('#homeQuick'); if(q) q.classList.toggle('quick4', on);   // 4 cols with Visit, 3 without
+  if(!on && $('#view-visit').classList.contains('active')) go('home');
+}
+
 function renderHeader(){
   const p=DB.p;
   const admin = DB.active===ADMIN;
   $('#avatar').textContent = initials(p?.name);
   $('#userName').textContent = p?.name || 'TA Diary';
   $('#userDesg').textContent = p ? ((p.desg||'Officer') + (admin?' ▾':'')) : 'Not signed in';
+  applyVisitVisibility();
 }
 $('#btnUser').onclick=()=>{
   if(DB.active!==ADMIN){ toast('Only the admin can switch officers'); return; }
@@ -1057,6 +1070,43 @@ function openSheet(title,html){ $('#sheetTitle').textContent=title; $('#sheetBod
 $('#sheetClose').onclick=()=>$('#sheet').classList.remove('open');
 $('#sheetPrint').onclick=()=>window.print();
 
+/* ---- Report export / share (used for TA Bill, Tour Diary, Visit Report) ---- */
+function reportFilename(){ return ($('#sheetTitle').textContent||'report').replace(/[^\w]+/g,'_'); }
+function reportWordHtml(){
+  return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">'
+    +'<head><meta charset="utf-8"><style>'
+    +'body{font-family:'+getComputedStyle(document.documentElement).getPropertyValue('--doc-font')+';}'
+    +'table{border-collapse:collapse;width:100%}td,th{border:1px solid #000;padding:4px 6px;font-size:11px;vertical-align:top}'
+    +'h1{font-size:15px;text-align:center}h2{font-size:13px;text-align:center}.right{text-align:right}.center{text-align:center}.num{text-align:right}'
+    +'.sign{display:flex;justify-content:space-between;margin-top:30px}</style></head><body>'
+    + $('#sheetBody').innerHTML + '</body></html>';
+}
+function reportWordFile(){
+  return new File(['﻿'+reportWordHtml()], reportFilename()+'.doc', {type:'application/msword'});
+}
+function downloadWord(){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(reportWordFile());
+  a.download=reportFilename()+'.doc'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+$('#sheetShare').onclick=async ()=>{
+  const title=$('#sheetTitle').textContent||'Report';
+  const file=reportWordFile();
+  // Prefer sharing the document itself (works on Android / most phones)
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title}); }
+    catch(e){ if(e && e.name!=='AbortError') toast('Could not share'); }
+    return;
+  }
+  // Fallback 1: share plain text of the report
+  if(navigator.share){
+    try{ await navigator.share({title, text:($('#sheetBody').innerText||'').trim()}); return; }
+    catch(e){ if(e && e.name==='AbortError') return; }
+  }
+  // Fallback 2: no share support (e.g. desktop) — save the file so it can be attached manually
+  downloadWord(); toast('Sharing not supported here — file saved so you can attach it');
+};
+
 $('#btnMenu').onclick=()=>$('#menuModal').classList.add('open');
 $('#miClose').onclick=()=>$('#menuModal').classList.remove('open');
 
@@ -1070,6 +1120,7 @@ function applyFont(){
 function openSettings(){
   const s=applyFont();
   $('#setFont').value=s.font; $('#setFontSize').value=s.size; $('#setNewPin').value='';
+  $('#setVisit').checked = visitOn(DB.active);
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
   if(admin){
@@ -1085,6 +1136,11 @@ function saveFont(){
   const s={font:$('#setFont').value,size:$('#setFontSize').value};
   LS.set('ta_settings',s); applyFont(); toast('Font updated');
 }
+$('#setVisit').onchange=()=>{
+  setVisitOn(DB.active, $('#setVisit').checked);
+  applyVisitVisibility();
+  toast($('#setVisit').checked ? 'Office Visit Report enabled' : 'Office Visit Report hidden');
+};
 $('#setFont').onchange=saveFont;
 $('#setFontSize').onchange=saveFont;
 // Unified PIN change — works in both cloud (Supabase password) and local (device PIN) modes.
@@ -1164,20 +1220,8 @@ function removeUser(email){
   renderAdminSettings(); toast('User removed');
 }
 
-/* ---- Word export ---- */
-$('#sheetWord').onclick=()=>{
-  const title=$('#sheetTitle').textContent||'report';
-  const html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">'
-    +'<head><meta charset="utf-8"><style>'
-    +'body{font-family:'+getComputedStyle(document.documentElement).getPropertyValue('--doc-font')+';}'
-    +'table{border-collapse:collapse;width:100%}td,th{border:1px solid #000;padding:4px 6px;font-size:11px;vertical-align:top}'
-    +'h1{font-size:15px;text-align:center}h2{font-size:13px;text-align:center}.right{text-align:right}.center{text-align:center}.num{text-align:right}'
-    +'.sign{display:flex;justify-content:space-between;margin-top:30px}</style></head><body>'
-    + $('#sheetBody').innerHTML + '</body></html>';
-  const blob=new Blob(['﻿'+html],{type:'application/msword'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=title.replace(/[^\w]+/g,'_')+'.doc'; a.click(); toast('Word file downloaded');
-};
+/* ---- Word export (save) ---- */
+$('#sheetWord').onclick=()=>{ downloadWord(); toast('Word file saved'); };
 
 /* ---- OCR (Diary detail text) ---- */
 function ensureTesseract(){ return new Promise((res,rej)=>{ if(window.Tesseract) return res();

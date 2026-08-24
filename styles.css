@@ -308,6 +308,8 @@ textarea{resize:vertical}
 .set-label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 6px}
 .set-preview{margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:12px;background:#fff;
   font-family:var(--doc-font);font-size:var(--doc-size)}
+.set-toggle{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;margin-top:4px}
+.set-toggle input{width:20px;height:20px;accent-color:var(--brand);flex:0 0 auto}
 .btn.danger{background:#fee2e2;color:#b91c1c}
 
 /* ---------- Toast ---------- */
