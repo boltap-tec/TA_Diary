@@ -625,7 +625,14 @@ $('#btnSaveEntry').onclick=()=>{
   }
   const arr=DB.allE.filter(x=>x.id!==e.id); arr.push(e); DB.allE=arr;
   sbUpsertEntry(e);
-  toast(editingId?'Entry updated ✓':'Entry saved ✓'); editingId=null; go('home');
+  // If this is a NEW field entry whose day is not yet complete (not back to HQ),
+  // keep the same date's next leg open automatically. Only a completed day sends
+  // you home, so the next date is started by tapping ＋.
+  const continueDay = !editingId && isField(today) && e.completed!=='Yes';
+  toast(editingId?'Entry updated ✓':(continueDay?'Leg saved — continue this date ✓':'Entry saved ✓'));
+  editingId=null;
+  if(continueDay){ go('entry'); }   // context keeps the same trip/date on the next leg
+  else go('home');
 };
 $('#btnCancelEntry').onclick=()=>{ editingId=null; go('home'); };
 
@@ -703,11 +710,12 @@ function iso(y,m,d){ return new Date(y,m,d).toLocaleDateString('en-CA'); }
 ['#rpAdvance','#rpHotel','#rpFrom','#rpTo'].forEach(s=>$(s).addEventListener('input',renderReportSummary));
 
 function renderReportSummary(){
+  const box=$('#reportSummary'); if(!box) return;   // summary card removed from Reports screen
   const {from,to}=getRange(); const t=taOf(entriesInRange(), DB.p);
   const advance=+$('#rpAdvance').value||0, hotel=+$('#rpHotel').value||0;
   const gross=t.amount+hotel, net=gross-advance;
   const label=(from||to)?`${fmtDate(from)||'…'} – ${fmtDate(to)||'…'}`:'All dates';
-  $('#reportSummary').innerHTML=`
+  box.innerHTML=`
     <div style="font-weight:800;margin-bottom:10px;font-size:14px">Period: ${label}</div>
     <div class="row"><span>Journeys (outside)</span><span>${t.es.length}</span></div>
     <div class="row"><span>Bus / train fare</span><span>₹${t.fare.toFixed(2)}</span></div>
@@ -855,25 +863,30 @@ function docTA(){
       <span class="right"><b>${esc(p.name)}</b><br>${esc(p.desg)}<br>(Signature of the Govt. Servant)</span></div>
   </div>`;
 
-  const page2=`<div class="doc">
-    <div style="font-weight:700">PART-B (To be filled in the Bill Section)</div>
-    <p class="small">The net entitlement on account of travelling allowance works out to Rs. ____________________ as detailed below :-</p>
-    <div class="kv small">(a) Railways / air / bus / steamer fare : Rs. ______________________</div>
-    <div class="kv small">(b) Road mileage for ______________ Kms. @ Rs. ____________ per km.</div>
-    <div class="kv small">(c) Daily allowance</div>
-    <div class="kv small" style="padding-left:20px">(i) ____________ day @ Rs. ____________ per day.</div>
-    <div class="kv small" style="padding-left:20px">(ii) ____________ day @ Rs. ____________ per day.</div>
-    <div class="kv small">(d) Actual expenses &nbsp; Rs. ____________________</div>
-    <div class="kv small right">Gross Amount &nbsp; Rs. ____________________</div>
-    <div class="kv small">(e) Less amount of T.A. advance, if any, drawn vide voucher No.______ date ______ Rs. ______</div>
-    <div class="kv small right">Net amount &nbsp; Rs. ____________________</div>
-    <p class="small">The expenditure is debitable to ____________________</p>
-    <div class="sign"><span>Initials of Bill Clerk</span><span>Signature of D.D.O.</span></div>
-    <div class="sign"><span>Counter signed</span><span>Signature of Controlling Officer</span></div>
+  const page2=`<div class="doc partb">
+    <div class="partb-title">PART-B (To be filled in the Bill Section)</div>
+    <p>The net entitlement on account of travelling allowance works out to Rs. ____________________ as detailed below :-</p>
+    <div class="kv">(a) Railways / air / bus / steamer fare : Rs. ______________________</div>
+    <div class="kv">(b) Road mileage for ______________ Kms. @ Rs. ____________ per km.</div>
+    <div class="kv">(c) Daily allowance</div>
+    <div class="kv" style="padding-left:24px">(i) ____________ day @ Rs. ____________ per day.</div>
+    <div class="kv" style="padding-left:24px">(ii) ____________ day @ Rs. ____________ per day.</div>
+    <div class="kv">(d) Actual expenses &nbsp; Rs. ____________________</div>
+    <div class="kv right">Gross Amount &nbsp; Rs. ____________________</div>
+    <div class="kv">(e) Less amount of T.A. advance, if any, drawn vide voucher No.______ date ______ Rs. ______</div>
+    <div class="kv right">Net amount &nbsp; Rs. ____________________</div>
+    <p>The expenditure is debitable to ____________________</p>
+    <div class="partb-signs">
+      <div class="sign"><span>Initials of Bill Clerk</span><span>Signature of D.D.O.</span></div>
+      <div class="sign"><span>Counter signed</span><span>Signature of Controlling Officer</span></div>
+    </div>
   </div>`;
 
-  const foodFrom = es.length? fmtDate(es[0].fromDate):periodLabel();
-  const foodTo   = es.length? fmtDate(es[es.length-1].toDate||es[es.length-1].fromDate):'';
+  // Use the selected filter range (From/To dates) for the tour period; fall back to
+  // the actual entry span only when "All" is selected (no range set).
+  const {from:rngFrom,to:rngTo}=getRange();
+  const foodFrom = rngFrom? fmtDate(rngFrom) : (es.length? fmtDate(es[0].fromDate):periodLabel());
+  const foodTo   = rngTo?   fmtDate(rngTo)   : (es.length? fmtDate(es[es.length-1].toDate||es[es.length-1].fromDate):'');
   const page3=`<div class="doc">
     <h2>ANNEXURE — 'B'</h2>
     <div class="center" style="font-weight:700;margin-bottom:10px">Expenditure incurred on account of Food bills during tour.</div>
