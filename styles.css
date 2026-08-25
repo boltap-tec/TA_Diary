@@ -197,12 +197,17 @@ textarea{resize:vertical}
 .tab-fab span{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font-size:30px;margin-top:-26px;box-shadow:0 8px 20px rgba(123,17,19,.45)}
 
 /* ---------- Report sheet ---------- */
-.sheet{position:fixed;inset:0;z-index:60;background:#4b4f54;display:none;flex-direction:column}
+.sheet{position:fixed;inset:0;z-index:60;background:#e8eaed;display:none;flex-direction:column}
 .sheet.open{display:flex}
 .sheet-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid var(--line);padding-top:max(10px,env(safe-area-inset-top))}
 .sheet-bar .btn{flex:0 0 auto;padding:10px 15px;font-size:14px}
 .sheet-title{font-weight:800;font-size:15px}
-.sheet-body{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.sheet-body{flex:1;overflow:auto;padding:18px}
+/* On-screen preview: render every page as a uniform full A4 sheet so short pages
+   (PART-B, Annexure) don't look like irregular blocks on the canvas.
+   Block flow (not flex) so pages never shrink or overlap each other. */
+.sheet-body .doc{margin:0 auto 22px;min-height:287mm;box-shadow:0 2px 14px rgba(0,0,0,.22)}
+.sheet-body .doc:last-child{margin-bottom:0}
 
 /* ---------- Printed document ---------- */
 .doc{background:#fff;width:200mm;max-width:100%;padding:14mm 13mm;color:#000;
@@ -222,6 +227,11 @@ textarea{resize:vertical}
 .doc table.desct .dd-place{font-weight:700;width:150px}
 .doc .small{font-size:.84em}
 .doc .num{text-align:right}
+/* Editable Hotel / Advance fields inside the TA Bill */
+.doc .docinp{width:100%;box-sizing:border-box;border:1px solid #b9b9b9;border-radius:4px;padding:2px 5px;font:inherit;color:#000;background:#fff}
+.doc input.docinp.num{text-align:right}
+.doc .docinp:focus{outline:2px solid var(--brand);outline-offset:0}
+.doc .docinp::-webkit-inner-spin-button,.doc .docinp::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .doc .kv{margin:2px 0}
 .doc .nb td{border:none;padding:2px 4px;background:#fff}
 .doc .sign{display:flex;justify-content:space-between;margin-top:34px;gap:20px}
@@ -232,6 +242,14 @@ textarea{resize:vertical}
 .doc .small{font-size:10px}
 .doc .desc{margin:3px 0;padding-left:2px}
 .doc .desc b{font-weight:700}
+
+/* ---------- PART-B : one full page, generous line spacing ---------- */
+.doc.partb{display:flex;flex-direction:column;min-height:250mm;font-size:14px;line-height:2}
+.doc.partb .partb-title{font-weight:700;font-size:17px;text-align:center;margin:4px 0 22px;letter-spacing:.02em}
+.doc.partb p{margin:20px 0;line-height:2.1}
+.doc.partb .kv{margin:20px 0;line-height:2.1}
+.doc.partb .partb-signs{margin-top:auto}
+.doc.partb .sign{margin-top:48px}
 
 /* ---------- Modals ---------- */
 .modal{position:fixed;inset:0;z-index:70;background:rgba(10,12,16,.55);display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
@@ -320,12 +338,15 @@ textarea{resize:vertical}
 /* ---------- Print ---------- */
 @media print{
   body{background:#fff;padding:0}
-  .appbar,.tabbar,.sheet-bar,.no-print{display:none!important}
+  #app,.appbar,.tabbar,.sheet-bar,.no-print{display:none!important}   /* only the document sheet prints */
   .sheet{position:static;background:#fff}
   .sheet-body{padding:0;display:block}
+  .sheet-body .doc{min-height:0}
+  .sheet-body .doc.partb{min-height:250mm}   /* PART-B still fills its own page in the PDF */
   .doc{box-shadow:none;width:auto;padding:0;font-size:11.5px;page-break-after:always}
   .doc:last-child{page-break-after:auto}
   tr,thead,.sign,ol,table{page-break-inside:avoid}   /* keep rows/blocks whole — no half pages */
+  .doc .docinp{border:none;border-radius:0;padding:0;background:transparent;-webkit-appearance:none;appearance:none}
   @page{size:A4;margin:12mm}
 }
 @media (max-width:430px){

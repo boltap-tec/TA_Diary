@@ -633,7 +633,14 @@ $('#btnSaveEntry').onclick=()=>{
   }
   const arr=DB.allE.filter(x=>x.id!==e.id); arr.push(e); DB.allE=arr;
   sbUpsertEntry(e);
-  toast(editingId?'Entry updated ✓':'Entry saved ✓'); editingId=null; go('home');
+  // If this is a NEW field entry whose day is not yet complete (not back to HQ),
+  // keep the same date's next leg open automatically. Only a completed day sends
+  // you home, so the next date is started by tapping ＋.
+  const continueDay = !editingId && isField(today) && e.completed!=='Yes';
+  toast(editingId?'Entry updated ✓':(continueDay?'Leg saved — continue this date ✓':'Entry saved ✓'));
+  editingId=null;
+  if(continueDay){ go('entry'); }   // context keeps the same trip/date on the next leg
+  else go('home');
 };
 $('#btnCancelEntry').onclick=()=>{ editingId=null; go('home'); };
 
@@ -692,6 +699,8 @@ $('#btnSaveProfile').onclick=()=>{
 /* =========================================================
    REPORTS
    ========================================================= */
+// Advance / Hotel are now entered inside the TA Bill (below the journey table), not on the Reports screen.
+let taAdvance=0, taHotel=0, taBaseAmount=0;
 function getRange(){ return { from:$('#rpFrom').value, to:$('#rpTo').value }; }
 function entriesInRange(){
   const {from,to}=getRange();
@@ -708,14 +717,15 @@ $$('#rpQuick button').forEach(b=>b.onclick=()=>{
   renderReportSummary();
 });
 function iso(y,m,d){ return new Date(y,m,d).toLocaleDateString('en-CA'); }
-['#rpAdvance','#rpHotel','#rpFrom','#rpTo'].forEach(s=>$(s).addEventListener('input',renderReportSummary));
+['#rpFrom','#rpTo'].forEach(s=>$(s).addEventListener('input',renderReportSummary));
 
 function renderReportSummary(){
+  const box=$('#reportSummary'); if(!box) return;   // summary card removed from Reports screen
   const {from,to}=getRange(); const t=taOf(entriesInRange(), DB.p);
-  const advance=+$('#rpAdvance').value||0, hotel=+$('#rpHotel').value||0;
+  const advance=taAdvance, hotel=taHotel;
   const gross=t.amount+hotel, net=gross-advance;
   const label=(from||to)?`${fmtDate(from)||'…'} – ${fmtDate(to)||'…'}`:'All dates';
-  $('#reportSummary').innerHTML=`
+  box.innerHTML=`
     <div style="font-weight:800;margin-bottom:10px;font-size:14px">Period: ${label}</div>
     <div class="row"><span>Journeys (outside)</span><span>${t.es.length}</span></div>
     <div class="row"><span>Bus / train fare</span><span>₹${t.fare.toFixed(2)}</span></div>
@@ -729,10 +739,34 @@ function renderReportSummary(){
 $$('.report-card').forEach(c=>c.onclick=()=>{
   if(!DB.p){ toast('Select an officer first'); return; }
   const r=c.dataset.r;
-  if(r==='ta') openSheet('TA Bill (Tour)', docTA());
+  if(r==='ta'){ openSheet('TA Bill (Tour)', docTA()); wireTADoc(); }
   if(r==='diary') openSheet('Tour Diary', docDiary());
   if(r==='visit') go('visit');
 });
+
+// Live Hotel / Advance inputs inside the TA Bill recompute the Gross, Net, words
+// and advance-drawn line without regenerating the sheet (keeps typing focus).
+function recomputeTA(){
+  const hInp=$('#taHotelInp'), aInp=$('#taAdvInp');
+  const hotel=+(hInp?.value)||0;
+  const advance=+(aInp?.value)||0;
+  taHotel=hotel; taAdvance=advance;                 // persist for print / re-open
+  // reflect typed values into the value attribute so Word export (innerHTML) keeps them
+  if(hInp) hInp.setAttribute('value', hInp.value);
+  if(aInp) aInp.setAttribute('value', aInp.value);
+  const gross=taBaseAmount+hotel, net=gross-advance;
+  const set=(id,v)=>{ const el=$(id); if(el) el.textContent=v; };
+  set('#taGross', gross.toFixed(2));
+  set('#taNet',  net.toFixed(2));
+  set('#taNet2', net.toFixed(2));
+  set('#taWords', numWords(Math.round(net)));
+  set('#taAdvDrawn', advance>0?advance.toFixed(2):'Nil');
+}
+function wireTADoc(){
+  const h=$('#taHotelInp'), a=$('#taAdvInp');
+  if(h) h.addEventListener('input', recomputeTA);
+  if(a) a.addEventListener('input', recomputeTA);
+}
 
 /* =========================================================
    MONTH SUMMARY
@@ -792,8 +826,9 @@ function periodLabel(){
 }
 function docTA(){
   const p=DB.p||{}; const t=taOf(entriesInRange(),p); const es=entriesInRange().filter(e=>isField(e.today));
-  const advance=+$('#rpAdvance').value||0;
-  const hotel=+$('#rpHotel').value||0;
+  const advance=taAdvance;
+  const hotel=taHotel;
+  taBaseAmount=t.amount;                 // TA+DA+auto+mileage; gross = base + hotel
   const gross=t.amount+hotel;
   const net=gross-advance;
   const rows=es.map(e=>`<tr>
@@ -842,14 +877,14 @@ function docTA(){
       <tr><td>Daily Allowance (${t.days.toFixed(2)} × ${(+p.daily||0).toFixed(2)})</td><td class="num">${t.daily.toFixed(2)}</td></tr>
       <tr><td>Auto fare</td><td class="num">${t.autoFare.toFixed(2)}</td></tr>
       <tr><td>Mileage ${t.distRef.toFixed(2)} (${t.distRef.toFixed(0)}×${+p.mileage||0})</td><td class="num">${t.mileage.toFixed(2)}</td></tr>
-      <tr><td>Hotel Rent / Staying Charges</td><td class="num">${hotel.toFixed(2)}</td></tr>
-      <tr class="tot"><td>Gross Total</td><td class="num">${gross.toFixed(2)}</td></tr>
-      <tr><td>Less: Advance Received</td><td class="num">${advance.toFixed(2)}</td></tr>
-      <tr class="tot"><td><b>Net Payable</b></td><td class="num"><b>${net.toFixed(2)}</b></td></tr>
+      <tr><td>Hotel Rent / Staying Charges</td><td class="num"><input id="taHotelInp" class="docinp num" type="number" step="1" min="0" value="${hotel||''}" placeholder="0.00"></td></tr>
+      <tr class="tot"><td>Gross Total</td><td class="num" id="taGross">${gross.toFixed(2)}</td></tr>
+      <tr><td>Less: Advance Received</td><td class="num"><input id="taAdvInp" class="docinp num" type="number" step="1" min="0" value="${advance||''}" placeholder="0.00"></td></tr>
+      <tr class="tot"><td><b>Net Payable</b></td><td class="num"><b id="taNet">${net.toFixed(2)}</b></td></tr>
       </tbody>
     </table>
-    <div class="kv" style="margin-top:6px"><b>RS. ${net.toFixed(2)} /-</b> ( ${esc(words)} Only )</div>
-    <div class="kv small">Amount of Advance of Travelling Allowances, if any, Drawn — Rs. ${advance>0?advance.toFixed(2):'Nil'}/-</div>
+    <div class="kv" style="margin-top:6px"><b>RS. <span id="taNet2">${net.toFixed(2)}</span> /-</b> ( <span id="taWords">${esc(words)}</span> Only )</div>
+    <div class="kv small">Amount of Advance of Travelling Allowances, if any, Drawn — Rs. <span id="taAdvDrawn">${advance>0?advance.toFixed(2):'Nil'}</span>/-</div>
     <hr>
     <div style="font-weight:700">TOUR CERTIFICATE</div>
     <ol class="small">
@@ -863,28 +898,30 @@ function docTA(){
       <span class="right"><b>${esc(p.name)}</b><br>${esc(p.desg)}<br>(Signature of the Govt. Servant)</span></div>
   </div>`;
 
-  const page2=`<div class="doc">
-    <div style="font-weight:700">PART-B (To be filled in the Bill Section)</div>
-    <p class="small">The net entitlement on account of travelling allowance works out to Rs. ____________________ as detailed below :-</p>
-    <div class="kv small">(a) Railways / air / bus / steamer fare : Rs. ______________________</div>
-    <div class="kv small">(b) Road mileage for ______________ Kms. @ Rs. ____________ per km.</div>
-    <div class="kv small">(c) Daily allowance</div>
-    <div class="kv small" style="padding-left:20px">(i) ____________ day @ Rs. ____________ per day.</div>
-    <div class="kv small" style="padding-left:20px">(ii) ____________ day @ Rs. ____________ per day.</div>
-    <div class="kv small">(d) Actual expenses &nbsp; Rs. ____________________</div>
-    <div class="kv small right">Gross Amount &nbsp; Rs. ____________________</div>
-    <div class="kv small">(e) Less amount of T.A. advance, if any, drawn vide voucher No.______ date ______ Rs. ______</div>
-    <div class="kv small right">Net amount &nbsp; Rs. ____________________</div>
-    <p class="small">The expenditure is debitable to ____________________</p>
-    <div class="sign"><span>Initials of Bill Clerk</span><span>Signature of D.D.O.</span></div>
-    <div class="sign"><span>Counter signed</span><span>Signature of Controlling Officer</span></div>
+  const page2=`<div class="doc partb">
+    <div class="partb-title">PART-B (To be filled in the Bill Section)</div>
+    <p>The net entitlement on account of travelling allowance works out to Rs. ____________________ as detailed below :-</p>
+    <div class="kv">(a) Railways / air / bus / steamer fare : Rs. ______________________</div>
+    <div class="kv">(b) Road mileage for ______________ Kms. @ Rs. ____________ per km.</div>
+    <div class="kv">(c) Daily allowance</div>
+    <div class="kv" style="padding-left:24px">(i) ____________ day @ Rs. ____________ per day.</div>
+    <div class="kv" style="padding-left:24px">(ii) ____________ day @ Rs. ____________ per day.</div>
+    <div class="kv">(d) Actual expenses &nbsp; Rs. ____________________</div>
+    <div class="kv right">Gross Amount &nbsp; Rs. ____________________</div>
+    <div class="kv">(e) Less amount of T.A. advance, if any, drawn vide voucher No.______ date ______ Rs. ______</div>
+    <div class="kv right">Net amount &nbsp; Rs. ____________________</div>
+    <p>The expenditure is debitable to ____________________</p>
+    <div class="partb-signs">
+      <div class="sign"><span>Initials of Bill Clerk</span><span>Signature of D.D.O.</span></div>
+      <div class="sign"><span>Counter signed</span><span>Signature of Controlling Officer</span></div>
+    </div>
   </div>`;
 
-  // Food-bill tour dates follow the selected report filter (From / To), not the
-  // saved travel entries. Fall back to entry dates only when no filter is set (All).
-  const rng = getRange();
-  const foodFrom = rng.from ? fmtDate(rng.from) : (es.length? fmtDate(es[0].fromDate):'');
-  const foodTo   = rng.to   ? fmtDate(rng.to)   : (es.length? fmtDate(es[es.length-1].toDate||es[es.length-1].fromDate):'');
+  // Use the selected filter range (From/To dates) for the tour period; fall back to
+  // the actual entry span only when "All" is selected (no range set).
+  const {from:rngFrom,to:rngTo}=getRange();
+  const foodFrom = rngFrom? fmtDate(rngFrom) : (es.length? fmtDate(es[0].fromDate):periodLabel());
+  const foodTo   = rngTo?   fmtDate(rngTo)   : (es.length? fmtDate(es[es.length-1].toDate||es[es.length-1].fromDate):'');
   const page3=`<div class="doc">
     <h2>ANNEXURE — 'B'</h2>
     <div class="center" style="font-weight:700;margin-bottom:10px">Expenditure incurred on account of Food bills during tour.</div>
@@ -969,7 +1006,7 @@ function docDiary(){
       <tbody>${rows}</tbody>
     </table>
     <div class="kv" style="margin-top:14px">Submitted to : <b>${esc(p.submitTo||'—')}</b></div>
-    <div style="margin-top:26px"><b>${esc(p.name)}</b><br>${esc(p.desg)}</div>
+    <div class="right" style="margin-top:26px"><b>${esc(p.name)}</b><br>${esc(p.desg)}<br>${esc(p.parent)} - ${esc(p.pincode)}</div>
   </div>`;
 }
 
