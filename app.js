@@ -298,7 +298,7 @@ function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0
    keeps their own; stored on the device keyed by email. ----- */
 const SETTINGS_DEFAULTS = { font:"'Times New Roman', serif", size:'12px',
   visit:false, autofillTime:false, autofillMode:false, stickyMode:false,
-  showDiary:true, autofillTaShort:false, autoTaFromDetail:false };
+  showDiary:true, autofillTaShort:false, autoTaFromDetail:false, timeSource:'own' };
 function userSettings(email){
   const all = LS.get('ta_user_settings', {});
   let s = all[email];
@@ -555,10 +555,11 @@ function autofillDF(){
     if(!$('#fDistance').value && rev.distance) $('#fDistance').value=rev.distance;
     if(!$('#fFare').value && rev.fare) $('#fFare').value=rev.fare;
     $('#dfHint').textContent = `↺ same-day return: ${rev.distance||0}km${rev.fare?(' ₹'+rev.fare):''}`;
-    // Times/mode for the return leg come from THIS officer's own latest PREVIOUS trip
-    // in this same direction (a past return), NOT from today's onward leg (whose
-    // times differ) and NOT from other officers' entries.
-    const hist=sortEntries(DB.e).reverse().find(e=>isField(e.today) && e.id!==rev.id
+    // Times/mode for the return leg come from the latest PREVIOUS trip in this same
+    // direction (a past return), NOT from today's onward leg (whose times differ).
+    // Source is chosen in Settings: this officer's own entries, or all users'.
+    const timeSrc = userSettings(DB.active).timeSource==='all' ? DB.allE : DB.e;
+    const hist=sortEntries(timeSrc).reverse().find(e=>isField(e.today) && e.id!==rev.id
       && (e.officeFrom||'').trim().toLowerCase()===from
       && (e.officeTo||'').trim().toLowerCase()===to);
     applyTripAutofill(hist);
@@ -583,12 +584,13 @@ function autofillDF(){
   if(!$('#fDistance').value && r.distance) $('#fDistance').value=r.distance;
   if(!$('#fFare').value && r.fare) $('#fFare').value=r.fare;
   $('#dfHint').textContent = `↺ ${r.distance||0}km${r.fare?(' ₹'+r.fare):''}`;
-  // Distance/fare above can use any officer's data, but the From/To time and mode
-  // are copied only from THIS officer's own previous trip on the same route.
-  const rSelf=sortEntries(DB.e).reverse().find(e=>isField(e.today)
+  // Distance/fare above always use any officer's data. From/To time and mode are
+  // copied from the source chosen in Settings — this officer's own entries, or all.
+  const timeSrc = userSettings(DB.active).timeSource==='all' ? DB.allE : DB.e;
+  const rTime=sortEntries(timeSrc).reverse().find(e=>isField(e.today)
     && (e.officeFrom||'').trim().toLowerCase()===from
     && (e.officeTo||'').trim().toLowerCase()===to);
-  applyTripAutofill(rSelf);
+  applyTripAutofill(rTime);
 }
 /* Copy From/To time and Mode from a matching earlier trip, if the officer enabled it. */
 function applyTripAutofill(r){
@@ -1449,6 +1451,7 @@ function openSettings(){
   $('#setAfTa').checked       = s.autofillTaShort;
   $('#setDiary').checked      = s.showDiary;
   $('#setAutoTa').checked     = s.autoTaFromDetail;
+  $('#setTimeSource').value   = s.timeSource || 'own';
   $('#setWhose').textContent  = 'These settings apply to ' + (DB.p?.name || DB.active || 'this officer') + ' only.';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
@@ -1478,6 +1481,8 @@ $('#setAfTa').onchange        =()=>{ setUserSetting(DB.active,'autofillTaShort',
 $('#setAutoTa').onchange      =()=>{ setUserSetting(DB.active,'autoTaFromDetail',$('#setAutoTa').checked);
   if($('#view-entry').classList.contains('active')) maybeAutoTaShort();
   toast($('#setAutoTa').checked ? 'TA short will be made from Diary detail' : 'Saved'); };
+$('#setTimeSource').onchange  =()=>{ setUserSetting(DB.active,'timeSource',$('#setTimeSource').value);
+  toast($('#setTimeSource').value==='all' ? 'Times will use all users’ entries' : 'Times will use your own entries'); };
 $('#setDiary').onchange       =()=>{ setUserSetting(DB.active,'showDiary',$('#setDiary').checked);
   if($('#view-entry').classList.contains('active')) setToday(curToday);   // re-apply field visibility now
   toast($('#setDiary').checked ? 'Diary fields shown' : 'Diary fields hidden'); };
