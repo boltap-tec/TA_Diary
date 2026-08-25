@@ -272,7 +272,7 @@ function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0
 /* ----- Per-user settings (font, Visit toggle, entry auto-fill). Each officer
    keeps their own; stored on the device keyed by email. ----- */
 const SETTINGS_DEFAULTS = { font:"'Times New Roman', serif", size:'12px',
-  visit:false, autofillTime:false, autofillMode:false, stickyBike:false };
+  visit:false, autofillTime:false, autofillMode:false, stickyMode:false };
 function userSettings(email){
   const all = LS.get('ta_user_settings', {});
   let s = all[email];
@@ -565,10 +565,10 @@ function applyContextToForm(){
   box.innerHTML = ctx.ongoing
     ? `🛵 <b>Continuing Trip ${ctx.tripNumber}</b> (Return leg). From <b>${esc(ctx.officeFrom)}</b>. Set "To" = <b>${esc(ctx.parent)}</b> to close the trip.`
     : `🚦 <b>Starting Trip ${ctx.tripNumber}</b> from <b>${esc(ctx.parent)}</b>.`;
-  // "Repeat Bike for the same date": if a trip on this date already used Bike, default to Bike.
-  if(userSettings(DB.active).stickyBike && !getMode()
-     && DB.e.some(e=>isField(e.today) && e.fromDate===nd && (e.mode||'').toLowerCase()==='bike')){
-    setModeValue('Bike'); updateModeFare();
+  // "Repeat the same date's mode": default to the mode already used on this date (any mode).
+  if(userSettings(DB.active).stickyMode && !getMode()){
+    const sameDay = sortEntries(DB.e).reverse().find(e=>isField(e.today) && e.fromDate===nd && (e.mode||'').trim());
+    if(sameDay){ setModeValue(sameDay.mode); updateModeFare(); }
   }
   showFromDay(); updateComplete();
 }
@@ -1257,7 +1257,7 @@ function openSettings(){
   $('#setVisit').checked      = s.visit;
   $('#setAfTime').checked     = s.autofillTime;
   $('#setAfMode').checked     = s.autofillMode;
-  $('#setStickyBike').checked = s.stickyBike;
+  $('#setStickyMode').checked = s.stickyMode;
   $('#setWhose').textContent  = 'These settings apply to ' + (DB.p?.name || DB.active || 'this officer') + ' only.';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
@@ -1282,7 +1282,7 @@ $('#setVisit').onchange=()=>{
 };
 $('#setAfTime').onchange     =()=>{ setUserSetting(DB.active,'autofillTime',$('#setAfTime').checked);   toast('Saved'); };
 $('#setAfMode').onchange     =()=>{ setUserSetting(DB.active,'autofillMode',$('#setAfMode').checked);   toast('Saved'); };
-$('#setStickyBike').onchange =()=>{ setUserSetting(DB.active,'stickyBike',$('#setStickyBike').checked); toast('Saved'); };
+$('#setStickyMode').onchange =()=>{ setUserSetting(DB.active,'stickyMode',$('#setStickyMode').checked); toast('Saved'); };
 $('#setFont').onchange=saveFont;
 $('#setFontSize').onchange=saveFont;
 // Unified PIN change — works in both cloud (Supabase password) and local (device PIN) modes.
