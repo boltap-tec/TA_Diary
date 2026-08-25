@@ -13,11 +13,12 @@
  * 4. Run setupDailyTrigger once to schedule it every day.
  ************************************************************/
 
-var SUPABASE_URL = 'https://qgcftcobtmvefcxptmfj.supabase.co';
-var ANON_KEY     = 'sb_publishable_juRrq6jbcs3CSyQ4y6gqyQ_BZIqAsXC';
-var ADMIN_EMAIL  = 'arulece05@gmail.com';
-var DRIVE_FOLDER = 'TA Diary Backups';
-var KEEP_DAYS    = 60;          // delete backups older than this (0 = keep all)
+var SUPABASE_URL    = 'https://qgcftcobtmvefcxptmfj.supabase.co';
+var ANON_KEY        = 'sb_publishable_juRrq6jbcs3CSyQ4y6gqyQ_BZIqAsXC';
+var ADMIN_EMAIL     = 'arulece05@gmail.com';
+var DRIVE_FOLDER_ID = '1GBVEZlwkrCQXC3cbgWRovZK2rP-ZB6W4';  // the shared backup folder (from its URL)
+var DRIVE_FOLDER    = 'TA Diary Backups';                   // fallback (used only if the ID is blank)
+var KEEP_DAYS       = 60;          // delete backups older than this (0 = keep all)
 
 function adminPin_() {
   return PropertiesService.getScriptProperties().getProperty('ADMIN_PIN') || '';
@@ -76,6 +77,7 @@ function mapVisit_(r) { return { id: r.id, email: r.email, date: r.date || '', o
   purpose: r.purpose || '', result: r.result || '' }; }
 
 function getFolder_() {
+  if (DRIVE_FOLDER_ID) return DriveApp.getFolderById(DRIVE_FOLDER_ID);   // exact folder from its URL
   var it = DriveApp.getFoldersByName(DRIVE_FOLDER);
   return it.hasNext() ? it.next() : DriveApp.createFolder(DRIVE_FOLDER);
 }
