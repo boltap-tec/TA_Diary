@@ -20,16 +20,28 @@ var DRIVE_FOLDER_ID = '1GBVEZlwkrCQXC3cbgWRovZK2rP-ZB6W4';  // the shared backup
 var DRIVE_FOLDER    = 'TA Diary Backups';                   // fallback (used only if the ID is blank)
 var KEEP_DAYS       = 60;          // delete backups older than this (0 = keep all)
 
+// Optional: put your PIN here if you don't want to use Script Properties.
+var ADMIN_PIN_INLINE = '';
+
 function adminPin_() {
-  return PropertiesService.getScriptProperties().getProperty('ADMIN_PIN') || '';
+  var p = PropertiesService.getScriptProperties().getProperty('ADMIN_PIN');
+  return (p || ADMIN_PIN_INLINE || '').toString().trim();
+}
+
+// Run this to check config WITHOUT revealing the PIN. Look at the Execution log.
+function checkConfig() {
+  Logger.log('ADMIN_EMAIL = %s', ADMIN_EMAIL);
+  Logger.log('ADMIN_PIN length = %s (should be 4)', adminPin_().length);
 }
 
 function login_() {
+  var pin = adminPin_();
+  if (!pin) throw new Error('ADMIN_PIN is empty. Set it in Project Settings -> Script Properties (key ADMIN_PIN), or set ADMIN_PIN_INLINE at the top of the script.');
   var res = UrlFetchApp.fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
     method: 'post',
     contentType: 'application/json',
     headers: { apikey: ANON_KEY },
-    payload: JSON.stringify({ email: ADMIN_EMAIL, password: adminPin_() + 'Aa#tadiary' }),
+    payload: JSON.stringify({ email: ADMIN_EMAIL, password: pin + 'Aa#tadiary' }),
     muteHttpExceptions: true
   });
   var body = JSON.parse(res.getContentText());
