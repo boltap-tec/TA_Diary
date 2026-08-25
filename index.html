@@ -37,7 +37,10 @@
       <span class="user-desg" id="userDesg">Tap to switch officer ▾</span>
     </span>
   </button>
-  <button class="icon-btn" id="btnMenu" title="Menu">⋮</button>
+  <div class="appbar-actions">
+    <button class="icon-btn bell" id="btnBell" title="Backup reminder" style="display:none">🔔<span class="bell-dot" id="bellDot" style="display:none"></span></button>
+    <button class="icon-btn" id="btnMenu" title="Menu">⋮</button>
+  </div>
 </header>
 
 <main id="app">
@@ -431,6 +434,7 @@
     <button class="menu-item" id="miSettings">⚙️ Settings (font, PIN, admin)</button>
     <button class="menu-item" id="miLogout">🚪 Logout</button>
     <button class="menu-item" id="miExport">⬇️ Export backup (JSON)</button>
+    <button class="menu-item" id="miExcel">📊 Export all data to Excel</button>
     <button class="menu-item" id="miImport">⬆️ Import backup (JSON)</button>
     <button class="menu-item" id="miReseed">🔄 Reload sample data (from Excel)</button>
     <button class="menu-item danger" id="miClear">🗑️ Clear all data</button>
@@ -439,11 +443,23 @@
   </div>
 </div>
 
+<!-- ============ BACKUP REMINDER ============ -->
+<div class="modal" id="backupModal" aria-hidden="true">
+  <div class="modal-card">
+    <h3>🔔 Weekly backup</h3>
+    <p class="login-sub" id="backupMsg" style="text-align:left;margin:0 0 14px"></p>
+    <button class="btn primary block" id="bkJson">⬇️ Export backup (JSON)</button>
+    <button class="btn ghost block" id="bkExcel" style="margin-top:8px">📊 Export all data to Excel</button>
+    <button class="btn ghost block" id="bkClose" style="margin-top:12px">Remind me later</button>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="vendor/html2pdf.bundle.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
 <script src="seed.js"></script>
 <script src="app.js"></script>
 </body>

@@ -43,6 +43,10 @@ input,select,textarea,button{font-family:inherit;font-size:15px}
 .user-name{font-weight:800;font-size:16px;letter-spacing:-.02em}
 .user-desg{font-size:11.5px;color:var(--muted)}
 .icon-btn{background:var(--bg);border:none;color:var(--ink);width:40px;height:40px;border-radius:12px;font-size:20px}
+.appbar-actions{display:flex;align-items:center;gap:8px}
+.icon-btn.bell{position:relative}
+.bell-dot{position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:var(--brand-2);border:2px solid var(--card);animation:bellpulse 1.6s ease-in-out infinite}
+@keyframes bellpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.25);opacity:.7}}
 
 /* ---------- Views ---------- */
 main{max-width:var(--maxw);margin:0 auto;padding:16px}

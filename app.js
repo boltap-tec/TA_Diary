@@ -155,6 +155,8 @@ async function doLogin(){
 function finishLoginUI(){
   $('#loginView').classList.remove('open'); $('#loginPin').value='';
   renderHeader(); go('home'); toast('Welcome, '+(DB.p?.name||''));
+  // Admin: nudge once at login if the weekly backup is overdue.
+  if(DB.active===ADMIN && backupDue()) setTimeout(openBackupModal, 900);
 }
 function finishLogin(email){
   DB.active=email; localStorage.setItem('ta_session',email);
@@ -322,6 +324,7 @@ function renderHeader(){
   $('#userDesg').textContent = p ? ((p.desg||'Officer') + (admin?' ▾':'')) : 'Not signed in';
   applyFont();               // per-user report font
   applyVisitVisibility();
+  refreshBackupBell();       // weekly backup reminder (admin)
 }
 $('#btnUser').onclick=()=>{
   if(DB.active!==ADMIN){ toast('Only the admin can switch officers'); return; }
@@ -1456,12 +1459,61 @@ $('#ocrFile').onchange=async(ev)=>{
 /* ---- Login ---- */
 $('#loginBtn').onclick=doLogin;
 $('#loginPin').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
-$('#miExport').onclick=()=>{
+$('#miExport').onclick=async ()=>{
   const data={profiles:DB.profiles,active:DB.active,entries:DB.allE,visits:DB.allV,exported:new Date().toISOString()};
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-  a.download=`ta-diary-backup-${todayISO()}.json`; a.click(); toast('Backup downloaded');
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  await deliverFile(blob, `ta-diary-backup-${todayISO()}.json`, false);   // saves on APK too
+  markBackupDone(); if(!isNative()) toast('Backup saved');
+  $('#menuModal').classList.remove('open');
 };
+
+/* ---- Export ALL data to a real Excel workbook (Entries / Visits / Profiles) ---- */
+async function exportExcel(){
+  if(!window.XLSX){ toast('Excel engine not loaded'); return; }
+  $('#menuModal').classList.remove('open'); toast('Preparing Excel…');
+  const nameOf={}; DB.profiles.forEach(p=>nameOf[p.email]=p.name||'');
+  const wb=XLSX.utils.book_new();
+  const entries=sortEntries(DB.allE).map(e=>({
+    Name:nameOf[e.email]||'', Email:e.email, Date:e.fromDate, Weekday:weekday(e.fromDate), Category:e.today,
+    'From Office':e.officeFrom, 'To Office':e.officeTo, 'From Time':e.fromTime, 'To Date':e.toDate, 'To Time':e.toTime,
+    Mode:e.mode, Distance:+e.distance||0, Fare:+e.fare||0, Days:+e.days||0, Trip:e.trip, Completed:e.completed,
+    'Diary Detail':e.diaryDetail, 'Diary Short':e.diaryShort, 'TA Short':e.taShort, Purpose:e.purpose }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(entries.length?entries:[{Note:'No entries'}]), 'Entries');
+  const visits=DB.allV.map(v=>({ Name:nameOf[v.email]||'', Email:v.email, Date:v.date, Office:v.office, Pincode:v.pincode,
+    Hardware:(v.hw||[]).filter(Boolean).join(', '), Software:(v.sw||[]).filter(Boolean).join(', '),
+    'APT/DTR':v.aptDtr, 'BO Balance':v.boBal, Discrepancies:v.disc, Purpose:v.purpose, Result:v.result }));
+  if(visits.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(visits), 'Visits');
+  const profs=DB.profiles.map(p=>({ Name:p.name, Email:p.email, Designation:p.desg, Basic:p.basic,
+    'Parent Office':p.parent, Pincode:p.pincode, 'Daily DA':p.daily, Mileage:p.mileage, 'Max Bike':p.maxBike,
+    'Submit To':p.submitTo, Every:p.every }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(profs), 'Profiles');
+  const arr=XLSX.write(wb,{type:'array',bookType:'xlsx'});
+  const blob=new Blob([arr],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  await deliverFile(blob, `ta-diary-${todayISO()}.xlsx`, false);
+  markBackupDone(); if(!isNative()) toast('Excel exported ✓');
+}
+$('#miExcel').onclick=exportExcel;
+
+/* ---- Weekly backup reminder (admin) ---- */
+function markBackupDone(){ LS.set('ta_last_backup', todayISO()); refreshBackupBell(); }
+function daysSinceBackup(){ const d=LS.get('ta_last_backup',null); return d? Math.floor((new Date(todayISO())-new Date(d))/864e5) : Infinity; }
+function backupDue(){ return daysSinceBackup()>=7; }
+function refreshBackupBell(){
+  const admin=DB.active===ADMIN, bell=$('#btnBell'); if(!bell) return;
+  bell.style.display = admin ? '' : 'none';
+  const dot=$('#bellDot'); if(dot) dot.style.display = (admin && backupDue()) ? '' : 'none';
+}
+function openBackupModal(){
+  const n=daysSinceBackup(), last=LS.get('ta_last_backup',null);
+  $('#backupMsg').innerHTML = last
+    ? `Last backup: <b>${fmtDate(last)}</b> (${n===0?'today':n+' day'+(n>1?'s':'')+' ago'}).<br>`+(backupDue()?'⚠️ It\'s time for your weekly backup.':'You\'re up to date — you can back up again anytime.')
+    : `No backup has been taken on this device yet.<br>Please export a backup to keep the data safe.`;
+  $('#menuModal').classList.remove('open'); $('#backupModal').classList.add('open');
+}
+$('#btnBell').onclick=openBackupModal;
+$('#bkClose').onclick=()=>$('#backupModal').classList.remove('open');
+$('#bkJson').onclick=()=>{ $('#backupModal').classList.remove('open'); $('#miExport').click(); };
+$('#bkExcel').onclick=()=>{ $('#backupModal').classList.remove('open'); exportExcel(); };
 $('#miImport').onclick=()=>$('#importFile').click();
 $('#importFile').onchange=(ev)=>{
   const f=ev.target.files[0]; if(!f) return; const r=new FileReader();
