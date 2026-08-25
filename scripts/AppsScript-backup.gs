@@ -4,55 +4,47 @@
  * to Google Drive in the app's Export format so it can be
  * restored via the app's Menu -> Import backup (JSON).
  *
+ * This version uses the Supabase SERVICE-ROLE (secret) key, which reads all
+ * data with no login/PIN — so nothing needs updating when the admin PIN changes.
+ * The service key bypasses ALL security: keep it ONLY in this private script.
+ *
  * SETUP
  * 1. https://script.google.com -> New project -> paste this file.
- * 2. Project Settings -> Script Properties, add:
- *      ADMIN_PIN = your admin PIN (e.g. 2020)
- *    (keeps the PIN out of the code). URL/key/email below are safe.
- * 3. Run backupTADiary once and authorize Drive access.
- * 4. Run setupDailyTrigger once to schedule it every day.
+ * 2. Supabase -> Project Settings -> API keys -> copy the service_role
+ *    (secret) key.
+ * 3. Apps Script -> Project Settings -> Script Properties, add:
+ *      SERVICE_ROLE_KEY = <paste the service_role key>
+ *    (or paste it into SERVICE_KEY_INLINE below — never commit it to git).
+ * 4. Run checkConfig to confirm the key is loaded, then backupTADiary and
+ *    authorize Drive access.
+ * 5. Run setupDailyTrigger once to schedule it every day.
  ************************************************************/
 
 var SUPABASE_URL    = 'https://qgcftcobtmvefcxptmfj.supabase.co';
-var ANON_KEY        = 'sb_publishable_juRrq6jbcs3CSyQ4y6gqyQ_BZIqAsXC';
-var ADMIN_EMAIL     = 'arulece05@gmail.com';
+var ADMIN_EMAIL     = 'arulece05@gmail.com';   // only used as the "active" field in the backup
 var DRIVE_FOLDER_ID = '1GBVEZlwkrCQXC3cbgWRovZK2rP-ZB6W4';  // the shared backup folder (from its URL)
 var DRIVE_FOLDER    = 'TA Diary Backups';                   // fallback (used only if the ID is blank)
 var KEEP_DAYS       = 60;          // delete backups older than this (0 = keep all)
 
-// Optional: put your PIN here if you don't want to use Script Properties.
-var ADMIN_PIN_INLINE = '';
+// Optional: paste the service_role key here instead of using Script Properties.
+// NEVER commit this file with a real key in it.
+var SERVICE_KEY_INLINE = '';
 
-function adminPin_() {
-  var p = PropertiesService.getScriptProperties().getProperty('ADMIN_PIN');
-  return (p || ADMIN_PIN_INLINE || '').toString().trim();
+function serviceKey_() {
+  var p = PropertiesService.getScriptProperties().getProperty('SERVICE_ROLE_KEY');
+  return (p || SERVICE_KEY_INLINE || '').toString().trim();
 }
 
-// Run this to check config WITHOUT revealing the PIN. Look at the Execution log.
+// Run this to confirm the key is loaded WITHOUT revealing it. See the Execution log.
 function checkConfig() {
-  Logger.log('ADMIN_EMAIL = %s', ADMIN_EMAIL);
-  Logger.log('ADMIN_PIN length = %s (should be 4)', adminPin_().length);
+  var k = serviceKey_();
+  Logger.log('SERVICE_ROLE_KEY loaded = %s (length %s)', k ? 'yes' : 'NO', k.length);
 }
 
-function login_() {
-  var pin = adminPin_();
-  if (!pin) throw new Error('ADMIN_PIN is empty. Set it in Project Settings -> Script Properties (key ADMIN_PIN), or set ADMIN_PIN_INLINE at the top of the script.');
-  var res = UrlFetchApp.fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { apikey: ANON_KEY },
-    payload: JSON.stringify({ email: ADMIN_EMAIL, password: pin + 'Aa#tadiary' }),
-    muteHttpExceptions: true
-  });
-  var body = JSON.parse(res.getContentText());
-  if (res.getResponseCode() !== 200 || !body.access_token) {
-    throw new Error('Login failed: ' + (body.error_description || body.msg || res.getResponseCode()));
-  }
-  return body.access_token;
-}
-
-function fetchAll_(table, token, orderCol) {
-  var auth = { apikey: ANON_KEY, Authorization: 'Bearer ' + token };
+function fetchAll_(table, orderCol) {
+  var key = serviceKey_();
+  if (!key) throw new Error('SERVICE_ROLE_KEY is empty. Add it in Project Settings -> Script Properties, or set SERVICE_KEY_INLINE.');
+  var auth = { apikey: key, Authorization: 'Bearer ' + key };
   var size = 1000, from = 0, out = [];
   while (true) {
     var url = SUPABASE_URL + '/rest/v1/' + table + '?select=*'
@@ -95,13 +87,11 @@ function getFolder_() {
 }
 
 function backupTADiary() {
-  var token = login_();
-  Utilities.sleep(2000); // let token issued-at settle past any small clock skew
   var data = {
-    profiles: fetchAll_('ta_profiles', token, 'email').map(mapProfile_),
+    profiles: fetchAll_('ta_profiles', 'email').map(mapProfile_),
     active: ADMIN_EMAIL,
-    entries: fetchAll_('ta_entries', token, 'id').map(mapEntry_),
-    visits: fetchAll_('ta_visits', token, 'id').map(mapVisit_),
+    entries: fetchAll_('ta_entries', 'id').map(mapEntry_),
+    visits: fetchAll_('ta_visits', 'id').map(mapVisit_),
     exported: new Date().toISOString()
   };
   var date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
