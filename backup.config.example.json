@@ -1,0 +1,9 @@
+{
+  "url": "https://YOUR-PROJECT-REF.supabase.co",
+  "anonKey": "YOUR-ANON-PUBLIC-KEY",
+  "adminEmail": "arulece05@gmail.com",
+  "adminPin": "YOUR-ADMIN-PIN",
+  "outDir": "C:/Users/ARUL/My Drive/TA Diary Backups",
+  "keepDays": 60,
+  "rcloneRemote": ""
+}

@@ -5,6 +5,8 @@ Thumbs.db
 
 # local secrets / config (never commit)
 config.js
+backup.config.json
+backups/
 .env
 .env.*
 
