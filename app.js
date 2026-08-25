@@ -203,15 +203,19 @@ function computeContext(){
   const p = DB.p || {};
   const parent = p.parent || 'Parent Office';
 
-  // --- next date: MAX(To_Date) over ALL entries (any category) + 1 if last row completed ---
+  // --- next date: MAX(To_Date) over ALL entries + 1, UNLESS an outside trip on that
+  // last date is still open (return leg pending) — then stay on it to add the return.
+  // (Basing this on the max date, not the last-sorted row, keeps it correct after a
+  //  delete: removing any entry simply recomputes the max — no phantom extra day.)
   const allList = sortEntries(DB.e);
   const lastAll = allList[allList.length - 1];
-  const lastAllCompleted = !lastAll || lastAll.completed === 'Yes';
-  let fromDate = todayISO();
+  let fromDate = todayISO(), maxTo = '';
   if (lastAll){
-    const maxTo = allList.reduce((mx,e)=>{ const d=e.toDate||e.fromDate||''; return d>mx?d:mx; }, '');
-    fromDate = lastAllCompleted ? addDays(maxTo,1) : maxTo;
+    maxTo = allList.reduce((mx,e)=>{ const d=e.toDate||e.fromDate||''; return d>mx?d:mx; }, '');
+    const openTripOnMax = DB.e.some(e => isField(e.today) && e.completed!=='Yes' && (e.toDate||e.fromDate)===maxTo);
+    fromDate = openTripOnMax ? maxTo : addDays(maxTo,1);
   }
+  const lastAllCompleted = !lastAll || lastAll.completed === 'Yes';
 
   // --- trip context: based only on office/outside entries ---
   const list = sortEntries(DB.e.filter(e => isField(e.today) || isOffice(e.today)));
@@ -257,9 +261,26 @@ $$('.tab, .quick-btn').forEach(t=>t.addEventListener('click',()=>{
    ========================================================= */
 function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?'; }
 
-/* ----- Office Visit Report is optional, per officer, OFF by default ----- */
-const visitOn = email => !!(LS.get('ta_visit_on', {})[email]);
-const setVisitOn = (email, val) => { const m = LS.get('ta_visit_on', {}); if(val) m[email]=true; else delete m[email]; LS.set('ta_visit_on', m); };
+/* ----- Per-user settings (font, Visit toggle, entry auto-fill). Each officer
+   keeps their own; stored on the device keyed by email. ----- */
+const SETTINGS_DEFAULTS = { font:"'Times New Roman', serif", size:'12px',
+  visit:false, autofillTime:false, autofillMode:false, stickyBike:false };
+function userSettings(email){
+  const all = LS.get('ta_user_settings', {});
+  let s = all[email];
+  if(!s){ // one-time migration from the older per-device / per-user keys
+    const oldFont = LS.get('ta_settings', null);
+    const oldVisit = !!(LS.get('ta_visit_on', {})[email]);
+    s = {}; if(oldFont){ s.font=oldFont.font; s.size=oldFont.size; } if(oldVisit) s.visit=true;
+  }
+  return { ...SETTINGS_DEFAULTS, ...s };
+}
+function setUserSetting(email, key, val){
+  const all = LS.get('ta_user_settings', {});
+  all[email] = { ...SETTINGS_DEFAULTS, ...userSettings(email), [key]:val };
+  LS.set('ta_user_settings', all);
+}
+const visitOn = email => userSettings(email).visit;
 function applyVisitVisibility(){
   const on = visitOn(DB.active);
   ['#tabVisit','#qVisit','[data-r="visit"]'].forEach(s=>{ const el=$(s); if(el) el.style.display = on?'':'none'; });
@@ -273,6 +294,7 @@ function renderHeader(){
   $('#avatar').textContent = initials(p?.name);
   $('#userName').textContent = p?.name || 'TA Diary';
   $('#userDesg').textContent = p ? ((p.desg||'Officer') + (admin?' ▾':'')) : 'Not signed in';
+  applyFont();               // per-user report font
   applyVisitVisibility();
 }
 $('#btnUser').onclick=()=>{
@@ -509,6 +531,17 @@ function autofillDF(){
   if(!$('#fDistance').value && r.distance) $('#fDistance').value=r.distance;
   if(!$('#fFare').value && r.fare) $('#fFare').value=r.fare;
   $('#dfHint').textContent = `↺ ${r.distance||0}km${r.fare?(' ₹'+r.fare):''}`;
+  applyTripAutofill(r);   // optional: copy time / mode from the latest similar trip
+}
+/* Copy From/To time and Mode from a matching earlier trip, if the officer enabled it. */
+function applyTripAutofill(r){
+  if(editingId || !r) return;
+  const st=userSettings(DB.active);
+  if(st.autofillTime){
+    if(!$('#fFromTime').value && r.fromTime) $('#fFromTime').value=r.fromTime;
+    if(!$('#fToTime').value   && r.toTime)   $('#fToTime').value  =r.toTime;
+  }
+  if(st.autofillMode && !getMode() && r.mode){ setModeValue(r.mode); updateModeFare(); }
 }
 ['#fOfficeFrom','#fOfficeTo'].forEach(s=>$(s).addEventListener('input',()=>{ updateComplete(); autofillDF(); }));
 
@@ -524,6 +557,11 @@ function applyContextToForm(){
   box.innerHTML = ctx.ongoing
     ? `🛵 <b>Continuing Trip ${ctx.tripNumber}</b> (Return leg). From <b>${esc(ctx.officeFrom)}</b>. Set "To" = <b>${esc(ctx.parent)}</b> to close the trip.`
     : `🚦 <b>Starting Trip ${ctx.tripNumber}</b> from <b>${esc(ctx.parent)}</b>.`;
+  // "Repeat Bike for the same date": if a trip on this date already used Bike, default to Bike.
+  if(userSettings(DB.active).stickyBike && !getMode()
+     && DB.e.some(e=>isField(e.today) && e.fromDate===nd && (e.mode||'').toLowerCase()==='bike')){
+    setModeValue('Bike'); updateModeFare();
+  }
   showFromDay(); updateComplete();
 }
 function showFromDay(){
@@ -1198,9 +1236,9 @@ $('#sheetWord').onclick =()=>doReport('save-word');
 $('#btnMenu').onclick=()=>$('#menuModal').classList.add('open');
 $('#miClose').onclick=()=>$('#menuModal').classList.remove('open');
 
-/* ---- Settings (font + PIN + admin) ---- */
+/* ---- Settings (per-user: font + Visit + auto-fill; plus PIN + admin) ---- */
 function applyFont(){
-  const s=LS.get('ta_settings',{font:"'Times New Roman', serif",size:'12px'});
+  const s=userSettings(DB.active);
   document.documentElement.style.setProperty('--doc-font',s.font);
   document.documentElement.style.setProperty('--doc-size',s.size);
   return s;
@@ -1208,7 +1246,11 @@ function applyFont(){
 function openSettings(){
   const s=applyFont();
   $('#setFont').value=s.font; $('#setFontSize').value=s.size; $('#setNewPin').value='';
-  $('#setVisit').checked = visitOn(DB.active);
+  $('#setVisit').checked      = s.visit;
+  $('#setAfTime').checked     = s.autofillTime;
+  $('#setAfMode').checked     = s.autofillMode;
+  $('#setStickyBike').checked = s.stickyBike;
+  $('#setWhose').textContent  = 'These settings apply to ' + (DB.p?.name || DB.active || 'this officer') + ' only.';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
   if(admin){
@@ -1221,14 +1263,18 @@ function openSettings(){
 $('#miSettings').onclick=openSettings;
 $('#settingsClose').onclick=()=>$('#settingsModal').classList.remove('open');
 function saveFont(){
-  const s={font:$('#setFont').value,size:$('#setFontSize').value};
-  LS.set('ta_settings',s); applyFont(); toast('Font updated');
+  setUserSetting(DB.active,'font',$('#setFont').value);
+  setUserSetting(DB.active,'size',$('#setFontSize').value);
+  applyFont(); toast('Font updated');
 }
 $('#setVisit').onchange=()=>{
-  setVisitOn(DB.active, $('#setVisit').checked);
+  setUserSetting(DB.active,'visit',$('#setVisit').checked);
   applyVisitVisibility();
   toast($('#setVisit').checked ? 'Office Visit Report enabled' : 'Office Visit Report hidden');
 };
+$('#setAfTime').onchange     =()=>{ setUserSetting(DB.active,'autofillTime',$('#setAfTime').checked);   toast('Saved'); };
+$('#setAfMode').onchange     =()=>{ setUserSetting(DB.active,'autofillMode',$('#setAfMode').checked);   toast('Saved'); };
+$('#setStickyBike').onchange =()=>{ setUserSetting(DB.active,'stickyBike',$('#setStickyBike').checked); toast('Saved'); };
 $('#setFont').onchange=saveFont;
 $('#setFontSize').onchange=saveFont;
 // Unified PIN change — works in both cloud (Supabase password) and local (device PIN) modes.
