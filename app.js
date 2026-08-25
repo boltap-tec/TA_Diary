@@ -821,8 +821,11 @@ $('#diaryDetailSug').addEventListener('change',function(){
 });
 
 /* ---- Diary detail → TA short text (offline, opt-in via Settings) ----
-   First matches known field-work terms; otherwise uses the opening phrase. */
+   Collects EVERY known topic found in the detail text (in the order they
+   appear) and joins them, e.g. "Antivirus, Telnet, Windows update, Firmware".
+   Falls back to the opening phrase only when nothing is recognised. */
 const TA_SHORT_MAP = [
+  // field / tour work
   [/\bsurprise\b/i,'Surprise Visit'],
   [/\bnight\s*halt\b/i,'Night Halt'],
   [/\bnew\b.*\bsub\s*office\b|\bnew\s*s\.?\s*o\b/i,'New S.O'],
@@ -837,21 +840,45 @@ const TA_SHORT_MAP = [
   [/\baudit/i,'Audit'],
   [/\btraining\b/i,'Training'],
   [/\bmeeting\b/i,'Meeting'],
-  [/\bippb\b/i,'IPPB'],
-  [/\baadha?ar|adhar\b/i,'Aadhaar'],
-  [/\bfinacle\b|\bcbs\b/i,'CBS'],
-  [/\bdelivery\b/i,'Delivery'],
   [/\baccount\s*opening|a\/c\s*opening/i,'A/c Opening'],
-  [/\bvisit/i,'Visit'],
+  // systems / IT (hardware & software visits)
+  [/\banti[-\s]?virus\b|trend\s*micro/i,'Antivirus'],
+  [/\btelnet\b/i,'Telnet'],
+  [/\bwindows?\s*updates?\b|\bwin\s*update/i,'Windows update'],
+  [/\bfirmware\b/i,'Firmware'],
+  [/\bups\b/i,'UPS'],
+  [/\bgenset\b/i,'Genset'],
+  [/\brouter\b|\bswitch\b|\bnetwork\b|\binternet\b/i,'Network'],
+  [/\bpassbook\s*printer\b/i,'Passbook printer'],
+  [/\bprinter\b/i,'Printer'],
+  [/\bscanner\b/i,'Scanner'],
+  [/\bbiometric\b/i,'Biometric'],
+  [/\bserver\b/i,'Server'],
+  [/\bippb\b/i,'IPPB'],
+  [/\baadha?ar\b|\badhar\b/i,'Aadhaar'],
+  [/\bfinacle\b|\bcbs\b/i,'CBS'],
+  [/\bapt\b/i,'APT'],
+  [/\bdelivery\b/i,'Delivery'],
 ];
 function deriveTaShort(detail){
   const text=(detail||'').replace(/\s+/g,' ').trim();
   if(!text) return '';
-  for(const [re,label] of TA_SHORT_MAP){ if(re.test(text)) return label; }
-  // fallback: first clause / first ~5 words, capped at 28 characters
+  // find every topic that appears, remembering where, then read them left→right
+  const hits=[];
+  for(const [re,label] of TA_SHORT_MAP){ const m=text.match(re); if(m) hits.push({label, at:m.index}); }
+  if(hits.length){
+    hits.sort((a,b)=>a.at-b.at);
+    let labels=[...new Set(hits.map(h=>h.label))];
+    if(labels.includes('Cash Verifn')) labels=labels.filter(l=>l!=='Verifn');   // avoid the double
+    if(labels.includes('Passbook printer')) labels=labels.filter(l=>l!=='Printer');
+    let out=labels.slice(0,7).join(', ');
+    if(out.length>80) out=out.slice(0,80).replace(/,[^,]*$/,'').trim();          // trim to whole tags
+    return out;
+  }
+  // fallback: opening clause / first ~6 words, capped
   let first=text.split(/[.,;\n]/)[0].trim();
-  let s=first.split(' ').slice(0,5).join(' ') || first;
-  if(s.length>28) s=s.slice(0,28).trim();
+  let s=first.split(' ').slice(0,6).join(' ') || first;
+  if(s.length>32) s=s.slice(0,32).trim();
   return s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
 }
 // Fill TA short from the detail text when the setting is on, it's a field (Outside)
