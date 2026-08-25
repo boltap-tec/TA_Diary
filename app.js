@@ -477,7 +477,7 @@ function resetEntryForm(){
   $('#fDistance').value=''; $('#fFare').value='';
   $('#fDiaryDetail').value=''; $('#fDiaryShort').value=''; $('#fTaShort').value='';
   setModeValue(''); $('#fDays').value=''; $('#fLeaveType').value='Leave (CL)';
-  ['#fDays','#fDistance','#fFare','#fFromTime','#fToTime','#fMode','#fTaShort'].forEach(s=>delete $(s).dataset.touched);
+  ['#fDays','#fDistance','#fFare','#fFromTime','#fToTime','#fMode','#fTaShort','#fCompleted'].forEach(s=>delete $(s).dataset.touched);
   $('#fCompleted').value='No'; $('#dfHint').textContent='';
   curToday=ctx.autoToday||'Outside';
   setToday(curToday);
@@ -538,7 +538,7 @@ $('#fMode').addEventListener('change',()=>{
   updateModeFare();
 });
 $('#fModeCustom').addEventListener('input',updateModeFare);
-$('#fCompleted').addEventListener('change',()=>{ updateDaysVisibility(); updateComplete(); });
+$('#fCompleted').addEventListener('change',()=>{ $('#fCompleted').dataset.touched='1'; updateDaysVisibility(); updateComplete(); });
 
 function autofillDF(){
   if(editingId) return;
@@ -604,6 +604,7 @@ function applyTripAutofill(r){
 function officeChanged(){
   if(editingId) return;
   const st=userSettings(DB.active);
+  delete $('#fCompleted').dataset.touched;   // a new To office re-applies the "Yes at HQ" default
   if(!$('#fDistance').dataset.touched) $('#fDistance').value='';
   if(!$('#fFare').dataset.touched)     $('#fFare').value='';
   if(st.autofillTime){
@@ -669,7 +670,7 @@ function updateComplete(){
   const to=$('#fOfficeTo').value.trim().toLowerCase();
   const parent=(DB.p?.parent||'').trim().toLowerCase();
   const backToHQ = to&&parent&&to===parent;
-  if(backToHQ) $('#fCompleted').value='Yes';
+  if(backToHQ && !$('#fCompleted').dataset.touched) $('#fCompleted').value='Yes';
   updateDaysVisibility();
   // On a return-to-HQ leg the journey carries no purpose — hide the text boxes
   if(isField(curToday)){
@@ -712,6 +713,7 @@ function loadEntryForm(id){
   $('#fDiaryShort').value=e.diaryShort||'';
   $('#fTaShort').value=e.taShort||'';
   $('#fCompleted').value=e.completed==='Yes'?'Yes':'No';
+  $('#fCompleted').dataset.touched='1';   // editing: keep the saved choice, don't auto-flip at save
   $('#fDays').value=e.days||'';
   updateDaysVisibility(); updateModeFare(); buildOfficeDatalist();
   $('#entryContext').classList.remove('show'); showFromDay();
@@ -764,7 +766,9 @@ $('#btnSaveEntry').onclick=()=>{
   else if(office){ e.completed='Yes'; }
   else{
     const toHQ=e.officeTo&&DB.p.parent&&e.officeTo.trim().toLowerCase()===DB.p.parent.trim().toLowerCase();
-    e.completed = toHQ ? 'Yes' : $('#fCompleted').value;
+    // Returning to HQ defaults to "Yes", but if the officer set the dropdown
+    // themselves (touched) keep their choice — so a trip can stay open on purpose.
+    e.completed = (toHQ && !$('#fCompleted').dataset.touched) ? 'Yes' : $('#fCompleted').value;
   }
   const arr=DB.allE.filter(x=>x.id!==e.id); arr.push(e); DB.allE=arr;
   sbUpsertEntry(e);
