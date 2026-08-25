@@ -173,7 +173,7 @@ function logout(){
 }
 
 /* ---------------- date / time helpers ---------------- */
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => new Date().toLocaleDateString('en-CA');   // local YYYY-MM-DD (avoids UTC off-by-one before ~5:30am IST)
 function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
 function weekday(iso){ if(!iso) return ''; return new Date(iso+'T00:00').toLocaleDateString('en-US',{weekday:'long'}); }
 function addDays(iso,n){ const [y,m,d]=iso.split('-').map(Number); const dt=new Date(Date.UTC(y,m-1,d)); dt.setUTCDate(dt.getUTCDate()+n); return dt.toISOString().slice(0,10); }
@@ -239,7 +239,13 @@ function computeContext(){
   let fromDate = todayISO(), maxTo = '';
   if (lastAll){
     maxTo = allList.reduce((mx,e)=>{ const d=e.toDate||e.fromDate||''; return d>mx?d:mx; }, '');
-    const openTripOnMax = DB.e.some(e => isField(e.today) && e.completed!=='Yes' && (e.toDate||e.fromDate)===maxTo);
+    // The day stays open only if the LAST leg on maxTo is still on tour (return
+    // pending). A completed multi-leg day also has an earlier onward leg with
+    // completed='No', so checking *any* leg wrongly kept the next date stuck on
+    // the same day — the next date must advance once the final leg returns to HQ.
+    const legsOnMax = sortEntries(DB.e.filter(e => isField(e.today) && (e.toDate||e.fromDate)===maxTo));
+    const lastLegOnMax = legsOnMax[legsOnMax.length-1];
+    const openTripOnMax = !!(lastLegOnMax && lastLegOnMax.completed!=='Yes');
     fromDate = openTripOnMax ? maxTo : addDays(maxTo,1);
   }
   const lastAllCompleted = !lastAll || lastAll.completed === 'Yes';
@@ -470,7 +476,8 @@ function resetEntryForm(){
   $('#fOfficeTo').value=''; $('#fFromTime').value=''; $('#fToTime').value='';
   $('#fDistance').value=''; $('#fFare').value='';
   $('#fDiaryDetail').value=''; $('#fDiaryShort').value=''; $('#fTaShort').value='';
-  setModeValue(''); $('#fDays').value=''; delete $('#fDays').dataset.touched; $('#fLeaveType').value='Leave (CL)';
+  setModeValue(''); $('#fDays').value=''; $('#fLeaveType').value='Leave (CL)';
+  ['#fDays','#fDistance','#fFare','#fFromTime','#fToTime','#fMode'].forEach(s=>delete $(s).dataset.touched);
   $('#fCompleted').value='No'; $('#dfHint').textContent='';
   curToday=ctx.autoToday||'Outside';
   setToday(curToday);
@@ -587,7 +594,30 @@ function applyTripAutofill(r){
   }
   if(st.autofillMode && !getMode() && r.mode){ setModeValue(r.mode); updateModeFare(); }
 }
-['#fOfficeFrom','#fOfficeTo'].forEach(s=>$(s).addEventListener('input',()=>{ updateComplete(); autofillDF(); }));
+['#fOfficeFrom','#fOfficeTo'].forEach(s=>$(s).addEventListener('input',()=>{
+  suggestInput($(s), $('#officeList'), allOffices);
+  updateComplete(); autofillDF();
+}));
+// When the From/To office is CHANGED (picked or edited), refresh the initialised
+// data (distance, fare, and — if their auto-fill is on — times/mode) so stale
+// values from the previous office don't stick. Fields the user typed are kept.
+function officeChanged(){
+  if(editingId) return;
+  const st=userSettings(DB.active);
+  if(!$('#fDistance').dataset.touched) $('#fDistance').value='';
+  if(!$('#fFare').dataset.touched)     $('#fFare').value='';
+  if(st.autofillTime){
+    if(!$('#fFromTime').dataset.touched) $('#fFromTime').value='';
+    if(!$('#fToTime').dataset.touched)   $('#fToTime').value='';
+  }
+  if(st.autofillMode && !$('#fMode').dataset.touched){ setModeValue(''); updateModeFare(); }
+  $('#dfHint').textContent='';
+  autofillDF();
+  updateComplete();
+}
+['#fOfficeFrom','#fOfficeTo'].forEach(s=>$(s).addEventListener('change', officeChanged));
+$('#fDiaryShort').addEventListener('input',()=>suggestInput($('#fDiaryShort'), $('#shortList'),   shortPoolFn));
+$('#fTaShort').addEventListener('input',   ()=>suggestInput($('#fTaShort'),    $('#taShortList'), taPoolFn));
 
 function applyContextToForm(){
   if(editingId) return;
@@ -656,8 +686,15 @@ function updateComplete(){
     ? '✅ Trip completed — DA auto-calculated (>8km & hours away). Editable.'
     : 'Mark "Yes" only on the leg where you return to HQ.';
 }
-$('#fDays').addEventListener('input',()=>{ $('#fDays').dataset.touched='1'; });
-['#fFromTime','#fToTime','#fFromDate','#fToDate'].forEach(s=>$(s).addEventListener('input',updateComplete));
+// Remember which fields the officer typed by hand, so auto-fill / auto-refresh
+// never overwrites a manual value.
+['#fDays','#fDistance','#fFare','#fFromTime','#fToTime'].forEach(s=>
+  $(s).addEventListener('input',()=>{ $(s).dataset.touched='1'; }));
+$('#fMode').addEventListener('change',()=>{ $('#fMode').dataset.touched='1'; });
+$('#fModeCustom').addEventListener('input',()=>{ $('#fMode').dataset.touched='1'; });
+// Distance now also re-triggers the DA-day calc (previously only time/date did),
+// so days are computed even when distance is filled after marking the trip done.
+['#fFromTime','#fToTime','#fFromDate','#fToDate','#fDistance'].forEach(s=>$(s).addEventListener('input',updateComplete));
 
 function loadEntryForm(id){
   const e=DB.allE.find(x=>x.id===id); if(!e) return;
@@ -709,7 +746,14 @@ $('#btnSaveEntry').onclick=()=>{
     fare: (office||isBike)?0:(+$('#fFare').value||0),
     diaryDetail, diaryShort, taShort,
     purpose: diaryDetail || (leave?leaveTypeVal:holiday?'Holiday':''),
-    days: (holiday||leave||office)?0:(completedVal==='Yes'?(+$('#fDays').value||0):0),
+    // DA days: when editing, keep the shown value. For a NEW completed trip, use the
+    // typed value if the officer set one, else compute it fresh at save time so it's
+    // never left at 0 just because the live calc didn't re-run.
+    days: (holiday||leave||office)?0:(completedVal==='Yes'
+      ?(editingId
+        ?(+$('#fDays').value||0)
+        :($('#fDays').dataset.touched?(+$('#fDays').value||0):(computeDAauto().days||+$('#fDays').value||0)))
+      :0),
   };
   if(editingId){ const old=DB.allE.find(x=>x.id===editingId); e.trip=old?.trip||ctx.tripNumber; e.tripType=old?.tripType||ctx.tripType; }
   else { e.trip=(holiday||leave)?0:ctx.tripNumber; e.tripType=ctx.tripType; }
@@ -732,18 +776,32 @@ $('#btnSaveEntry').onclick=()=>{
 };
 $('#btnCancelEntry').onclick=()=>{ editingId=null; go('home'); };
 
+/* Suggestion pools (built fresh each call so they include the latest entries). */
+const _uniq = arr => [...new Set(arr.filter(Boolean).map(x=>x.toString().trim()).filter(Boolean))];
+function allOffices(){
+  const arr=[].concat(DB.e.map(e=>e.officeTo), DB.e.map(e=>e.officeFrom), DB.v.map(v=>v.office));
+  if(DB.p?.parent) arr.push(DB.p.parent);
+  return _uniq(arr);
+}
+const shortPoolFn = () => _uniq(DB.e.map(e=>e.diaryShort));
+const taPoolFn    = () => _uniq(DB.e.map(e=>e.taShort));
+/* Fill a <datalist> with pool matches ONLY after 4+ characters are typed.
+   Keeps the whole list from dumping on tap and covering the phone screen. */
+function suggestInput(inputEl, datalistEl, poolFn, minLen=4){
+  const q=(inputEl.value||'').trim().toLowerCase();
+  if(q.length<minLen){ datalistEl.innerHTML=''; return; }
+  const opts=(poolFn()||[]).filter(x=>x.toLowerCase().includes(q)).slice(0,8);
+  datalistEl.innerHTML=opts.map(o=>`<option value="${esc(o)}">`).join('');
+}
 function buildOfficeDatalist(){
   const recent = sortEntries(DB.e).reverse();               // newest first
-  const uniq = arr => [...new Set(arr.filter(Boolean).map(x=>x.toString().trim()).filter(Boolean))];
-  const offices = uniq([].concat(...recent.map(e=>[e.officeTo, e.officeFrom])));
-  if(DB.p?.parent && !offices.includes(DB.p.parent)) offices.push(DB.p.parent);
-  $('#officeList').innerHTML = offices.map(o=>`<option value="${esc(o)}">`).join('');
+  const uniq = _uniq;
+  // Datalists start EMPTY — options are added only after 4+ letters are typed
+  // (see suggestInput), so nothing dumps on tap and the phone screen stays clear.
+  $('#officeList').innerHTML=''; $('#shortList').innerHTML=''; $('#taShortList').innerHTML='';
 
-
-  // suggestions from THIS user's previously saved entries (recent first)
-  const dl=$('#shortList'), tl=$('#taShortList'), ds=$('#diaryDetailSug');
-  if(dl) dl.innerHTML = uniq(recent.map(e=>e.diaryShort)).slice(0,50).map(s=>`<option value="${esc(s)}">`).join('');
-  if(tl) tl.innerHTML = uniq(recent.map(e=>e.taShort)).slice(0,50).map(s=>`<option value="${esc(s)}">`).join('');
+  // The "Insert a saved note" picker stays a full dropdown (the user opens it on purpose).
+  const ds=$('#diaryDetailSug');
   if(ds){
     const notes=uniq(recent.map(e=>e.diaryDetail)).slice(0,40);
     ds.innerHTML = '<option value="">💡 Insert a saved note…</option>'
@@ -1116,7 +1174,7 @@ function buildVisitControls(){
   $('#vSoftware').innerHTML=getSW().map((n,i)=>row(n,'sw',i)).join('');
 }
 // auto-fetch pincode from APT office directory when office chosen
-$('#vOffice').addEventListener('input',()=>{ const pin=officePin($('#vOffice').value); if(pin) $('#vPincode').value=pin; });
+$('#vOffice').addEventListener('input',()=>{ suggestInput($('#vOffice'), $('#officeList'), allOffices); const pin=officePin($('#vOffice').value); if(pin) $('#vPincode').value=pin; });
 function renderVisits(){
   buildVisitControls();
   if(!$('#vDate').value) $('#vDate').value=todayISO();
@@ -1414,17 +1472,36 @@ function removeUser(email){
 function ensureTesseract(){ return new Promise((res,rej)=>{ if(window.Tesseract) return res();
   const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
   s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
-// shrink large photos before OCR — a full-res phone photo is very slow to scan
-function downscaleImage(file, maxDim){
+// Pre-process a photo for OCR: normalise resolution (upscale small shots, cap
+// huge ones), convert to grayscale, then stretch contrast so text edges are
+// crisp. This lifts Tesseract accuracy a lot on clear printed pages — the main
+// gains available on-device without a cloud OCR service.
+function preprocessImage(file){
   return new Promise(resolve=>{
     const url=URL.createObjectURL(file), img=new Image();
     img.onload=()=>{
-      const scale=Math.min(1, maxDim/Math.max(img.width,img.height));
+      const longest=Math.max(img.width,img.height)||1;
+      const target=Math.min(2200, Math.max(1600, longest));   // aim for 1600–2200px on the long side
+      const scale=target/longest;
       const w=Math.max(1,Math.round(img.width*scale)), h=Math.max(1,Math.round(img.height*scale));
       const c=document.createElement('canvas'); c.width=w; c.height=h;
-      c.getContext('2d').drawImage(img,0,0,w,h);
+      const cx=c.getContext('2d'); cx.drawImage(img,0,0,w,h);
       URL.revokeObjectURL(url);
-      c.toBlob(b=>resolve(b||file),'image/jpeg',0.85);
+      try{
+        const im=cx.getImageData(0,0,w,h), d=im.data;
+        let mn=255,mx=0;
+        for(let i=0;i<d.length;i+=4){                        // grayscale + find min/max
+          const g=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)|0;
+          d[i]=d[i+1]=d[i+2]=g; if(g<mn)mn=g; if(g>mx)mx=g;
+        }
+        const range=Math.max(1,mx-mn);
+        for(let i=0;i<d.length;i+=4){                        // contrast stretch to full 0–255
+          let v=((d[i]-mn)*255/range)|0; v=v<0?0:v>255?255:v;
+          d[i]=d[i+1]=d[i+2]=v;
+        }
+        cx.putImageData(im,0,0);
+      }catch(e){/* tainted/large canvas — fall back to the plain resized image */}
+      c.toBlob(b=>resolve(b||file),'image/png');            // PNG keeps text edges sharp
     };
     img.onerror=()=>{ URL.revokeObjectURL(url); resolve(file); };
     img.src=url;
@@ -1438,6 +1515,10 @@ async function ocrWorker(st){
   _ocrWorker=await Tesseract.createWorker('eng',1,{logger:m=>{
     if(m.status==='recognizing text') st.textContent='Scanning… '+Math.round(m.progress*100)+'%';
   }});
+  try{ await _ocrWorker.setParameters({
+    tessedit_pageseg_mode: '6',        // treat the photo as a single uniform block of text
+    preserve_interword_spaces: '1',    // keep spacing between words
+  }); }catch(e){/* older tesseract build — ignore */}
   return _ocrWorker;
 }
 $('#ocrBtn').onclick=()=>$('#ocrFile').click();
@@ -1445,7 +1526,7 @@ $('#ocrFile').onchange=async(ev)=>{
   const f=ev.target.files[0]; if(!f) return; const st=$('#ocrStatus'); const btn=$('#ocrBtn');
   btn.disabled=true; st.textContent='Preparing image…';
   try{
-    const img=await downscaleImage(f,1500);
+    const img=await preprocessImage(f);
     const w=await ocrWorker(st);
     st.textContent='Scanning…';
     const {data}=await w.recognize(img);
