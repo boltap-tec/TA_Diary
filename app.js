@@ -298,7 +298,8 @@ function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0
    keeps their own; stored on the device keyed by email. ----- */
 const SETTINGS_DEFAULTS = { font:"'Times New Roman', serif", size:'12px',
   visit:false, autofillTime:false, autofillMode:false, stickyMode:false,
-  showDiary:true, autofillTaShort:false, autoTaFromDetail:false };
+  showDiary:true, autofillTaShort:false, autoTaFromDetail:false,
+  useDefaultTimes:false, defaultFromTime:'', defaultToTime:'' };
 function userSettings(email){
   const all = LS.get('ta_user_settings', {});
   let s = all[email];
@@ -607,7 +608,7 @@ function officeChanged(){
   delete $('#fCompleted').dataset.touched;   // a new To office re-applies the "Yes at HQ" default
   if(!$('#fDistance').dataset.touched) $('#fDistance').value='';
   if(!$('#fFare').dataset.touched)     $('#fFare').value='';
-  if(st.autofillTime){
+  if(st.autofillTime && !st.useDefaultTimes){
     if(!$('#fFromTime').dataset.touched) $('#fFromTime').value='';
     if(!$('#fToTime').dataset.touched)   $('#fToTime').value='';
   }
@@ -641,6 +642,12 @@ function applyContextToForm(){
   if(userSettings(DB.active).autofillTaShort && !$('#fTaShort').value){
     const prev = sortEntries(DB.e).reverse().find(e=>isField(e.today) && (e.taShort||'').trim());
     if(prev) $('#fTaShort').value = prev.taShort;
+  }
+  // Officer's default From/To time (from Settings) — start new tour entries with them.
+  const stt=userSettings(DB.active);
+  if(stt.useDefaultTimes){
+    if(!$('#fFromTime').value && stt.defaultFromTime) $('#fFromTime').value=stt.defaultFromTime;
+    if(!$('#fToTime').value   && stt.defaultToTime)   $('#fToTime').value  =stt.defaultToTime;
   }
   showFromDay(); updateComplete();
 }
@@ -1443,6 +1450,9 @@ function openSettings(){
   $('#setAfTa').checked       = s.autofillTaShort;
   $('#setDiary').checked      = s.showDiary;
   $('#setAutoTa').checked     = s.autoTaFromDetail;
+  $('#setUseDefTimes').checked= s.useDefaultTimes;
+  $('#setDefFromTime').value  = s.defaultFromTime||'';
+  $('#setDefToTime').value    = s.defaultToTime||'';
   $('#setWhose').textContent  = 'These settings apply to ' + (DB.p?.name || DB.active || 'this officer') + ' only.';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
@@ -1472,6 +1482,9 @@ $('#setAfTa').onchange        =()=>{ setUserSetting(DB.active,'autofillTaShort',
 $('#setAutoTa').onchange      =()=>{ setUserSetting(DB.active,'autoTaFromDetail',$('#setAutoTa').checked);
   if($('#view-entry').classList.contains('active')) maybeAutoTaShort();
   toast($('#setAutoTa').checked ? 'TA short will be made from Diary detail' : 'Saved'); };
+$('#setUseDefTimes').onchange =()=>{ setUserSetting(DB.active,'useDefaultTimes',$('#setUseDefTimes').checked); toast($('#setUseDefTimes').checked?'Default times will be used':'Saved'); };
+$('#setDefFromTime').onchange =()=>{ setUserSetting(DB.active,'defaultFromTime',$('#setDefFromTime').value); toast('Default From time saved'); };
+$('#setDefToTime').onchange   =()=>{ setUserSetting(DB.active,'defaultToTime',$('#setDefToTime').value); toast('Default To time saved'); };
 $('#setDiary').onchange       =()=>{ setUserSetting(DB.active,'showDiary',$('#setDiary').checked);
   if($('#view-entry').classList.contains('active')) setToday(curToday);   // re-apply field visibility now
   toast($('#setDiary').checked ? 'Diary fields shown' : 'Diary fields hidden'); };
