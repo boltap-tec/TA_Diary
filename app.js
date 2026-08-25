@@ -518,6 +518,12 @@ function autofillDF(){
     if(!$('#fDistance').value && rev.distance) $('#fDistance').value=rev.distance;
     if(!$('#fFare').value && rev.fare) $('#fFare').value=rev.fare;
     $('#dfHint').textContent = `↺ same-day return: ${rev.distance||0}km${rev.fare?(' ₹'+rev.fare):''}`;
+    // Times/mode for the return leg come from the latest PREVIOUS trip in this same
+    // direction (a past return), NOT from today's onward leg (whose times differ).
+    const hist=sortEntries(DB.allE).reverse().find(e=>isField(e.today) && e.id!==rev.id
+      && (e.officeFrom||'').trim().toLowerCase()===from
+      && (e.officeTo||'').trim().toLowerCase()===to);
+    applyTripAutofill(hist);
     return;
   }
 
