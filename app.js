@@ -272,7 +272,8 @@ function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0
 /* ----- Per-user settings (font, Visit toggle, entry auto-fill). Each officer
    keeps their own; stored on the device keyed by email. ----- */
 const SETTINGS_DEFAULTS = { font:"'Times New Roman', serif", size:'12px',
-  visit:false, autofillTime:false, autofillMode:false, stickyMode:false };
+  visit:false, autofillTime:false, autofillMode:false, stickyMode:false,
+  showDiary:true, autofillTaShort:false };
 function userSettings(email){
   const all = LS.get('ta_user_settings', {});
   let s = all[email];
@@ -478,6 +479,15 @@ function setToday(v){
   updateDaysVisibility();
   updateModeFare();
   applyContextToForm();
+  applyDiaryVisibility();
+}
+// Hide the Diary fields (short text, long/detail text, OCR) when the officer
+// turns off "Diary needed" in Settings. TA short text is not affected.
+function applyDiaryVisibility(){
+  if(userSettings(DB.active).showDiary===false){
+    $('#wrapDiaryShort').style.display='none';
+    $('#wrapDiaryDetail').style.display='none';
+  }
 }
 $$('#todayWork button').forEach(b=>b.onclick=()=>setToday(b.dataset.v));
 
@@ -576,6 +586,11 @@ function applyContextToForm(){
     const sameDay = sortEntries(DB.e).reverse().find(e=>isField(e.today) && e.fromDate===nd && (e.mode||'').trim());
     if(sameDay){ setModeValue(sameDay.mode); updateModeFare(); }
   }
+  // Auto-fetch TA short text from the officer's most recent previous entry that has one.
+  if(userSettings(DB.active).autofillTaShort && !$('#fTaShort').value){
+    const prev = sortEntries(DB.e).reverse().find(e=>isField(e.today) && (e.taShort||'').trim());
+    if(prev) $('#fTaShort').value = prev.taShort;
+  }
   showFromDay(); updateComplete();
 }
 function showFromDay(){
@@ -612,6 +627,7 @@ function updateComplete(){
     $('#wrapDiaryDetail').style.display = showText?'block':'none';
     $('#wrapDiaryShort').style.display  = showText?'block':'none';
     $('#wrapTaShort').style.display     = showText?'block':'none';
+    applyDiaryVisibility();
   }
   const {days,hrs,maxDist}=computeDAauto();
   if($('#fCompleted').value==='Yes' && !editingId && !$('#fDays').dataset.touched){ $('#fDays').value=days||''; }
@@ -1264,6 +1280,8 @@ function openSettings(){
   $('#setAfTime').checked     = s.autofillTime;
   $('#setAfMode').checked     = s.autofillMode;
   $('#setStickyMode').checked = s.stickyMode;
+  $('#setAfTa').checked       = s.autofillTaShort;
+  $('#setDiary').checked      = s.showDiary;
   $('#setWhose').textContent  = 'These settings apply to ' + (DB.p?.name || DB.active || 'this officer') + ' only.';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
@@ -1289,6 +1307,10 @@ $('#setVisit').onchange=()=>{
 $('#setAfTime').onchange     =()=>{ setUserSetting(DB.active,'autofillTime',$('#setAfTime').checked);   toast('Saved'); };
 $('#setAfMode').onchange     =()=>{ setUserSetting(DB.active,'autofillMode',$('#setAfMode').checked);   toast('Saved'); };
 $('#setStickyMode').onchange =()=>{ setUserSetting(DB.active,'stickyMode',$('#setStickyMode').checked); toast('Saved'); };
+$('#setAfTa').onchange        =()=>{ setUserSetting(DB.active,'autofillTaShort',$('#setAfTa').checked); toast('Saved'); };
+$('#setDiary').onchange       =()=>{ setUserSetting(DB.active,'showDiary',$('#setDiary').checked);
+  if($('#view-entry').classList.contains('active')) setToday(curToday);   // re-apply field visibility now
+  toast($('#setDiary').checked ? 'Diary fields shown' : 'Diary fields hidden'); };
 $('#setFont').onchange=saveFont;
 $('#setFontSize').onchange=saveFont;
 // Unified PIN change — works in both cloud (Supabase password) and local (device PIN) modes.
