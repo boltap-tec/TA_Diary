@@ -97,11 +97,19 @@ const setPin = (email, pin) => { const m = LS.get('ta_pins', {}); m[email] = pin
 const isBlocked = email => (LS.get('ta_blocked', [])||[]).includes(email);
 
 function showLogin(){
-  $('#emailList').innerHTML = DB.profiles.map(p=>`<option value="${esc(p.email)}">`).join('');
+  $('#emailList').innerHTML = '';   // don't reveal the full email list; suggest only after 4+ chars typed
   $('#loginMsg').classList.remove('err');
   $('#loginMsg').innerHTML='Default PIN is <b>1234</b>. You can change it anytime in Profile.';
   $('#loginView').classList.add('open');
 }
+// Suggest matching emails only after the officer types the first 4 characters.
+$('#loginEmail').addEventListener('input', ()=>{
+  const q=$('#loginEmail').value.trim().toLowerCase();
+  if(q.length<4){ $('#emailList').innerHTML=''; return; }
+  $('#emailList').innerHTML = DB.profiles
+    .filter(p=>(p.email||'').toLowerCase().includes(q))
+    .map(p=>`<option value="${esc(p.email)}">`).join('');
+});
 async function doLogin(){
   const email=$('#loginEmail').value.trim().toLowerCase();
   const pin=$('#loginPin').value.trim();
