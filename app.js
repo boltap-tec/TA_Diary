@@ -298,7 +298,7 @@ function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0
    keeps their own; stored on the device keyed by email. ----- */
 const SETTINGS_DEFAULTS = { font:"'Times New Roman', serif", size:'12px',
   visit:false, autofillTime:false, autofillMode:false, stickyMode:false,
-  showDiary:true, autofillTaShort:false };
+  showDiary:true, autofillTaShort:false, autoTaFromDetail:false };
 function userSettings(email){
   const all = LS.get('ta_user_settings', {});
   let s = all[email];
@@ -477,7 +477,7 @@ function resetEntryForm(){
   $('#fDistance').value=''; $('#fFare').value='';
   $('#fDiaryDetail').value=''; $('#fDiaryShort').value=''; $('#fTaShort').value='';
   setModeValue(''); $('#fDays').value=''; $('#fLeaveType').value='Leave (CL)';
-  ['#fDays','#fDistance','#fFare','#fFromTime','#fToTime','#fMode'].forEach(s=>delete $(s).dataset.touched);
+  ['#fDays','#fDistance','#fFare','#fFromTime','#fToTime','#fMode','#fTaShort'].forEach(s=>delete $(s).dataset.touched);
   $('#fCompleted').value='No'; $('#dfHint').textContent='';
   curToday=ctx.autoToday||'Outside';
   setToday(curToday);
@@ -617,7 +617,7 @@ function officeChanged(){
 }
 ['#fOfficeFrom','#fOfficeTo'].forEach(s=>$(s).addEventListener('change', officeChanged));
 $('#fDiaryShort').addEventListener('input',()=>suggestInput($('#fDiaryShort'), $('#shortList'),   shortPoolFn));
-$('#fTaShort').addEventListener('input',   ()=>suggestInput($('#fTaShort'),    $('#taShortList'), taPoolFn));
+$('#fTaShort').addEventListener('input',   ()=>{ $('#fTaShort').dataset.touched='1'; suggestInput($('#fTaShort'), $('#taShortList'), taPoolFn); });
 
 function applyContextToForm(){
   if(editingId) return;
@@ -731,7 +731,10 @@ $('#btnSaveEntry').onclick=()=>{
   const completedVal = office ? 'Yes' : $('#fCompleted').value;
   const diaryDetail = $('#fDiaryDetail').value.trim();
   const diaryShort  = $('#fDiaryShort').value.trim();
-  const taShort     = $('#fTaShort').value.trim();
+  let   taShort     = $('#fTaShort').value.trim();
+  // Setting: derive the TA short from the Diary detail if none was entered.
+  if(!taShort && !office && !holiday && !leave && userSettings(DB.active).autoTaFromDetail)
+    taShort = deriveTaShort(diaryDetail);
   const e={
     id: editingId || uid(), email: DB.active, today,
     leaveType: leave ? leaveTypeVal : '',
@@ -814,7 +817,55 @@ $('#diaryDetailSug').addEventListener('change',function(){
   const box=$('#fDiaryDetail');
   box.value = box.value.trim() ? box.value.trim()+'\n'+this.value : this.value;
   this.value='';
+  maybeAutoTaShort();
 });
+
+/* ---- Diary detail → TA short text (offline, opt-in via Settings) ----
+   First matches known field-work terms; otherwise uses the opening phrase. */
+const TA_SHORT_MAP = [
+  [/\bsurprise\b/i,'Surprise Visit'],
+  [/\bnight\s*halt\b/i,'Night Halt'],
+  [/\bnew\b.*\bsub\s*office\b|\bnew\s*s\.?\s*o\b/i,'New S.O'],
+  [/\bnew\b.*\bbranch\s*office\b|\bnew\s*b\.?\s*o\b/i,'New B.O'],
+  [/\binspect|inspn/i,'Inspn'],
+  [/\bcash\b.*\bverif/i,'Cash Verifn'],
+  [/\bverif/i,'Verifn'],
+  [/\benquir|inquir/i,'Enquiry'],
+  [/\binvestigat/i,'Investigation'],
+  [/\bcomplaint/i,'Complaint'],
+  [/\bfraud/i,'Fraud'],
+  [/\baudit/i,'Audit'],
+  [/\btraining\b/i,'Training'],
+  [/\bmeeting\b/i,'Meeting'],
+  [/\bippb\b/i,'IPPB'],
+  [/\baadha?ar|adhar\b/i,'Aadhaar'],
+  [/\bfinacle\b|\bcbs\b/i,'CBS'],
+  [/\bdelivery\b/i,'Delivery'],
+  [/\baccount\s*opening|a\/c\s*opening/i,'A/c Opening'],
+  [/\bvisit/i,'Visit'],
+];
+function deriveTaShort(detail){
+  const text=(detail||'').replace(/\s+/g,' ').trim();
+  if(!text) return '';
+  for(const [re,label] of TA_SHORT_MAP){ if(re.test(text)) return label; }
+  // fallback: first clause / first ~5 words, capped at 28 characters
+  let first=text.split(/[.,;\n]/)[0].trim();
+  let s=first.split(' ').slice(0,5).join(' ') || first;
+  if(s.length>28) s=s.slice(0,28).trim();
+  return s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
+}
+// Fill TA short from the detail text when the setting is on, it's a field (Outside)
+// entry, and the officer hasn't typed a TA short themselves.
+function maybeAutoTaShort(){
+  if(!userSettings(DB.active).autoTaFromDetail) return;
+  if(!isField(curToday)) return;
+  const ta=$('#fTaShort');
+  if(ta.dataset.touched) return;
+  const derived=deriveTaShort($('#fDiaryDetail').value);
+  if(derived) ta.value=derived;
+}
+// Recompute the TA short when the officer finishes editing the detail text.
+$('#fDiaryDetail').addEventListener('change', maybeAutoTaShort);
 
 /* =========================================================
    PROFILE
@@ -1360,6 +1411,7 @@ function openSettings(){
   $('#setStickyMode').checked = s.stickyMode;
   $('#setAfTa').checked       = s.autofillTaShort;
   $('#setDiary').checked      = s.showDiary;
+  $('#setAutoTa').checked     = s.autoTaFromDetail;
   $('#setWhose').textContent  = 'These settings apply to ' + (DB.p?.name || DB.active || 'this officer') + ' only.';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
@@ -1386,6 +1438,9 @@ $('#setAfTime').onchange     =()=>{ setUserSetting(DB.active,'autofillTime',$('#
 $('#setAfMode').onchange     =()=>{ setUserSetting(DB.active,'autofillMode',$('#setAfMode').checked);   toast('Saved'); };
 $('#setStickyMode').onchange =()=>{ setUserSetting(DB.active,'stickyMode',$('#setStickyMode').checked); toast('Saved'); };
 $('#setAfTa').onchange        =()=>{ setUserSetting(DB.active,'autofillTaShort',$('#setAfTa').checked); toast('Saved'); };
+$('#setAutoTa').onchange      =()=>{ setUserSetting(DB.active,'autoTaFromDetail',$('#setAutoTa').checked);
+  if($('#view-entry').classList.contains('active')) maybeAutoTaShort();
+  toast($('#setAutoTa').checked ? 'TA short will be made from Diary detail' : 'Saved'); };
 $('#setDiary').onchange       =()=>{ setUserSetting(DB.active,'showDiary',$('#setDiary').checked);
   if($('#view-entry').classList.contains('active')) setToday(curToday);   // re-apply field visibility now
   toast($('#setDiary').checked ? 'Diary fields shown' : 'Diary fields hidden'); };
@@ -1532,7 +1587,7 @@ $('#ocrFile').onchange=async(ev)=>{
     const {data}=await w.recognize(img);
     const txt=(data.text||'').replace(/[ \t]+\n/g,'\n').replace(/\n{2,}/g,'\n').trim();
     if(!txt){ st.textContent='No readable text found — try a clearer, well-lit, straight photo.'; }
-    else{ const box=$('#fDiaryDetail'); box.value=(box.value?box.value.trim()+'\n':'')+txt; st.textContent='✓ Added '+txt.length+' characters.'; }
+    else{ const box=$('#fDiaryDetail'); box.value=(box.value?box.value.trim()+'\n':'')+txt; maybeAutoTaShort(); st.textContent='✓ Added '+txt.length+' characters.'; }
   }catch(e){ st.textContent='⚠ OCR failed — it needs internet the first time. Please retry online.'; }
   btn.disabled=false; ev.target.value='';
 };
