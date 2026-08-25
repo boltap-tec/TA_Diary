@@ -67,19 +67,36 @@ async function sbSetProfilePin(email,pin){ const c=sbClient(); if(!sbOn()) retur
 const profileToRow = p => ({email:p.email,name:p.name||'',designation:p.desg||'',basic:p.basic||'',parent_office:p.parent||'',pincode:p.pincode||'',
   daily_ta_fare:+p.daily||0,mileage_fare:+p.mileage||0,max_bike:+p.maxBike||0,submit_to:p.submitTo||'',submit_every:p.every||'Fortnight'});
 
+/* Fetch every row of a table, paging past Supabase's 1000-row-per-request cap.
+   Without this, tables larger than 1000 rows (entries, routes, …) load only
+   partially, so recent entries silently go missing from the app. */
+async function sbSelectAll(table, orderCol){
+  const c=sbClient(); const size=1000; const out=[]; let from=0;
+  for(;;){
+    let q=c.from(table).select('*').range(from, from+size-1);
+    if(orderCol) q=q.order(orderCol,{ascending:true});
+    const { data, error } = await q;
+    if(error) throw error;
+    out.push(...(data||[]));
+    if(!data || data.length<size) break;
+    from += size;
+  }
+  return out;
+}
+
 /* pull this user's data (RLS returns own rows, or all for admin) + shared tables into the local cache */
 async function sbPull(){
   const c=sbClient(); if(!c) return;
   try{
     const [offs, rts, profs, ents, vis] = await Promise.all([
-      c.from('ta_offices').select('*'), c.from('ta_routes').select('*'),
-      c.from('ta_profiles').select('*'), c.from('ta_entries').select('*'), c.from('ta_visits').select('*')
+      sbSelectAll('ta_offices','name'), sbSelectAll('ta_routes','office_from'),
+      sbSelectAll('ta_profiles','email'), sbSelectAll('ta_entries','id'), sbSelectAll('ta_visits','id')
     ]);
-    if(offs.data){ const m={}; offs.data.forEach(o=>m[(o.name||'').toLowerCase()]=o.pincode); (window.TA_SEED=window.TA_SEED||{}).officePins=m; }
-    if(rts.data){ const m={}; rts.data.forEach(r=>m[(r.office_from||'').toLowerCase()+'||'+(r.office_to||'').toLowerCase()]={d:+r.distance||0,f:+r.fare||0}); (window.TA_SEED=window.TA_SEED||{}).routes=m; }
-    if(profs.data && profs.data.length) DB.profiles = profs.data.map(rowToProfile);
-    if(ents.data) DB.allE = ents.data.map(rowToEntry);
-    if(vis.data)  DB.allV = vis.data.map(rowToVisit);
+    { const m={}; offs.forEach(o=>m[(o.name||'').toLowerCase()]=o.pincode); (window.TA_SEED=window.TA_SEED||{}).officePins=m; }
+    { const m={}; rts.forEach(r=>m[(r.office_from||'').toLowerCase()+'||'+(r.office_to||'').toLowerCase()]={d:+r.distance||0,f:+r.fare||0}); (window.TA_SEED=window.TA_SEED||{}).routes=m; }
+    if(profs.length) DB.profiles = profs.map(rowToProfile);
+    DB.allE = ents.map(rowToEntry);
+    DB.allV = vis.map(rowToVisit);
   }catch(e){ console.warn('sbPull failed (using cached data):', e.message); }
 }
 /* best-effort writes */
