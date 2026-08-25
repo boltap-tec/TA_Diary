@@ -1,61 +1,82 @@
 /************************************************************
  * TA Diary — daily backup via Google Apps Script.
- * Runs in Google's cloud (no PC needed), saves a dated JSON
- * to Google Drive in the app's Export format so it can be
- * restored via the app's Menu -> Import backup (JSON).
+ * Runs in Google's cloud (no PC needed), saves a dated JSON to
+ * Google Drive in the app's Export format so it can be restored
+ * via the app's Menu -> Import backup (JSON).
  *
- * This version uses the Supabase SERVICE-ROLE (secret) key, which reads all
- * data with no login/PIN — so nothing needs updating when the admin PIN changes.
- * The service key bypasses ALL security: keep it ONLY in this private script.
+ * TWO WAYS TO AUTHENTICATE — pick one:
  *
- * SETUP
- * 1. https://script.google.com -> New project -> paste this file.
- * 2. Supabase -> Project Settings -> API keys -> copy the service_role
- *    (secret) key.
- * 3. Apps Script -> Project Settings -> Script Properties, add:
- *      SERVICE_ROLE_KEY = <paste the service_role key>
- *    (or paste it into SERVICE_KEY_INLINE below — never commit it to git).
- * 4. Run checkConfig to confirm the key is loaded, then backupTADiary and
- *    authorize Drive access.
- * 5. Run setupDailyTrigger once to schedule it every day.
+ *  MODE A (no PIN maintenance) — use the LEGACY service_role key:
+ *    Supabase -> Project Settings -> API -> "Legacy API keys" ->
+ *    copy the service_role key (a long JWT starting with eyJ...).
+ *    Put it in Script Property SERVICE_ROLE_KEY.
+ *    NOTE: the NEW sb_secret_... keys DO NOT work here — Supabase blocks
+ *    secret keys from browser-like callers ("Forbidden use of secret API
+ *    key in browser"). Use the legacy service_role JWT instead.
+ *
+ *  MODE B (fallback) — admin PIN login:
+ *    Leave SERVICE_ROLE_KEY blank and set Script Property ADMIN_PIN = your PIN.
+ *    (If you change the app PIN later, update ADMIN_PIN too.)
+ *
+ * SETUP: paste this file into a new script.google.com project, set the one
+ * Script Property above, run checkConfig, then backupTADiary (authorize Drive),
+ * then setupDailyTrigger once.
  ************************************************************/
 
 var SUPABASE_URL    = 'https://qgcftcobtmvefcxptmfj.supabase.co';
-var ADMIN_EMAIL     = 'arulece05@gmail.com';   // only used as the "active" field in the backup
-var DRIVE_FOLDER_ID = '1GBVEZlwkrCQXC3cbgWRovZK2rP-ZB6W4';  // the shared backup folder (from its URL)
-var DRIVE_FOLDER    = 'TA Diary Backups';                   // fallback (used only if the ID is blank)
+var PUBLISHABLE_KEY = 'sb_publishable_juRrq6jbcs3CSyQ4y6gqyQ_BZIqAsXC';  // safe; used for MODE B login
+var ADMIN_EMAIL     = 'arulece05@gmail.com';   // login (MODE B) + "active" field in the backup
+var DRIVE_FOLDER_ID = '1GBVEZlwkrCQXC3cbgWRovZK2rP-ZB6W4';  // the backup folder (from its URL)
+var DRIVE_FOLDER    = 'TA Diary Backups';                   // fallback name if the ID is blank
 var KEEP_DAYS       = 60;          // delete backups older than this (0 = keep all)
 
-// Optional: paste the service_role key here instead of using Script Properties.
-// NEVER commit this file with a real key in it.
+// Optional inline values (never commit real secrets). Prefer Script Properties.
 var SERVICE_KEY_INLINE = '';
+var ADMIN_PIN_INLINE   = '';
 
-function serviceKey_() {
-  var p = PropertiesService.getScriptProperties().getProperty('SERVICE_ROLE_KEY');
-  return (p || SERVICE_KEY_INLINE || '').toString().trim();
-}
+function scriptProp_(k) { return (PropertiesService.getScriptProperties().getProperty(k) || '').toString().trim(); }
+function serviceKey_()  { return scriptProp_('SERVICE_ROLE_KEY') || SERVICE_KEY_INLINE.trim(); }
+function adminPin_()    { return scriptProp_('ADMIN_PIN') || ADMIN_PIN_INLINE.trim(); }
 
-// Run this to confirm the key is loaded WITHOUT revealing it. See the Execution log.
+// Confirm config without revealing secrets. See View -> Execution log.
 function checkConfig() {
-  var k = serviceKey_();
-  Logger.log('SERVICE_ROLE_KEY loaded = %s (length %s)', k ? 'yes' : 'NO', k.length);
+  Logger.log('SERVICE_ROLE_KEY set = %s', serviceKey_() ? 'yes (MODE A)' : 'no');
+  Logger.log('ADMIN_PIN length     = %s %s', adminPin_().length, serviceKey_() ? '(ignored while MODE A)' : '(MODE B)');
 }
 
-function fetchAll_(table, orderCol) {
-  var key = serviceKey_();
-  if (!key) throw new Error('SERVICE_ROLE_KEY is empty. Add it in Project Settings -> Script Properties, or set SERVICE_KEY_INLINE.');
-  var auth = { apikey: key, Authorization: 'Bearer ' + key };
+function login_() {
+  var pin = adminPin_();
+  if (!pin) throw new Error('Set SERVICE_ROLE_KEY (legacy service_role JWT) OR ADMIN_PIN in Script Properties.');
+  var res = UrlFetchApp.fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+    method: 'post', contentType: 'application/json', headers: { apikey: PUBLISHABLE_KEY },
+    payload: JSON.stringify({ email: ADMIN_EMAIL, password: pin + 'Aa#tadiary' }), muteHttpExceptions: true
+  });
+  var b = JSON.parse(res.getContentText());
+  if (res.getResponseCode() !== 200 || !b.access_token) throw new Error('Login failed: ' + (b.error_description || b.msg || res.getResponseCode()));
+  return b.access_token;
+}
+
+// Returns { apikey, bearer } for the REST calls.
+function getAuth_() {
+  var sk = serviceKey_();
+  if (sk) return { apikey: sk, bearer: sk };          // MODE A
+  var token = login_(); Utilities.sleep(1500);         // MODE B (settle token clock skew)
+  return { apikey: PUBLISHABLE_KEY, bearer: token };
+}
+
+function fetchAll_(table, orderCol, auth) {
+  var headers = { apikey: auth.apikey, Authorization: 'Bearer ' + auth.bearer };
   var size = 1000, from = 0, out = [];
   while (true) {
     var url = SUPABASE_URL + '/rest/v1/' + table + '?select=*'
       + (orderCol ? '&order=' + orderCol + '.asc' : '') + '&limit=' + size + '&offset=' + from;
     var rows = null;
     for (var attempt = 0; attempt < 5; attempt++) {
-      var r = UrlFetchApp.fetch(url, { headers: auth, muteHttpExceptions: true });
+      var r = UrlFetchApp.fetch(url, { headers: headers, muteHttpExceptions: true });
       var code = r.getResponseCode(), txt = r.getContentText();
       if (code === 200) { rows = JSON.parse(txt); break; }
       if (code === 401 && txt.indexOf('PGRST303') >= 0) { Utilities.sleep(1500); continue; } // clock skew
-      throw new Error(table + ' fetch failed: ' + code + ' ' + txt.slice(0, 140));
+      throw new Error(table + ' fetch failed: ' + code + ' ' + txt.slice(0, 160));
     }
     if (rows === null) throw new Error(table + ' fetch failed after retries');
     out = out.concat(rows);
@@ -87,19 +108,19 @@ function getFolder_() {
 }
 
 function backupTADiary() {
+  var auth = getAuth_();
   var data = {
-    profiles: fetchAll_('ta_profiles', 'email').map(mapProfile_),
+    profiles: fetchAll_('ta_profiles', 'email', auth).map(mapProfile_),
     active: ADMIN_EMAIL,
-    entries: fetchAll_('ta_entries', 'id').map(mapEntry_),
-    visits: fetchAll_('ta_visits', 'id').map(mapVisit_),
+    entries: fetchAll_('ta_entries', 'id', auth).map(mapEntry_),
+    visits: fetchAll_('ta_visits', 'id', auth).map(mapVisit_),
     exported: new Date().toISOString()
   };
   var date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   var name = 'ta-diary-backup-' + date + '.json';
   var folder = getFolder_();
-  // overwrite same-day file
   var ex = folder.getFilesByName(name);
-  while (ex.hasNext()) ex.next().setTrashed(true);
+  while (ex.hasNext()) ex.next().setTrashed(true);   // overwrite same-day file
   folder.createFile(name, JSON.stringify(data, null, 2), 'application/json');
   Logger.log('Wrote %s (profiles=%s entries=%s visits=%s)', name, data.profiles.length, data.entries.length, data.visits.length);
   pruneOld_(folder);
@@ -115,7 +136,7 @@ function pruneOld_(folder) {
   }
 }
 
-// Run this ONCE to schedule a daily backup (~9 PM).
+// Run once to schedule a daily backup (~9 PM).
 function setupDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'backupTADiary') ScriptApp.deleteTrigger(t);
