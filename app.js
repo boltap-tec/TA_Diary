@@ -1455,6 +1455,8 @@ async function doReport(kind /* 'share-pdf' | 'save-pdf' | 'save-word' */){
 $('#sheetShare').onclick=()=>doReport('share-pdf');
 $('#sheetPrint').onclick=()=>doReport('save-pdf');
 $('#sheetWord').onclick =()=>doReport('save-word');
+// Direct browser print (uses @media print styles) — print now or Save as PDF from the dialog
+$('#sheetPrintNow').onclick=()=>window.print();
 
 $('#btnMenu').onclick=()=>$('#menuModal').classList.add('open');
 $('#miClose').onclick=()=>$('#menuModal').classList.remove('open');
