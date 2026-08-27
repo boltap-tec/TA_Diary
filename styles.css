@@ -212,6 +212,13 @@ textarea{resize:vertical}
    second page when exported to PDF via html2pdf. Block flow, sized to content. */
 .sheet-body .doc{margin:0 auto 22px;box-shadow:0 2px 14px rgba(0,0,0,.22)}
 .sheet-body .doc:last-child{margin-bottom:0}
+/* During PDF export the sheet is locked to a fixed width so html2pdf renders the
+   A4 document identically on every device (no shrink, no shift/clipping). */
+.sheet-body.pdfexport{width:760px;max-width:none;padding:0;display:block}
+.sheet-body.pdfexport .doc{width:760px;max-width:none;margin:0 0 8px;box-shadow:none}
+/* Break before each subsequent page — NOT before the first (that made html2pdf
+   emit a blank leading page). html2pdf reads this via its 'css' pagebreak mode. */
+.sheet-body.pdfexport .doc + .doc{page-break-before:always;break-before:page}
 
 /* ---------- Printed document ---------- */
 .doc{background:#fff;width:200mm;max-width:100%;padding:14mm 13mm;color:#000;

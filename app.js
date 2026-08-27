@@ -1390,14 +1390,22 @@ function reportPdfBlob(){
   const opt={
     margin:[8,8,8,8],
     image:{type:'jpeg',quality:0.98},
-    // windowWidth pins the render viewport so the A4 document renders at full
-    // width even from a narrow phone/APK screen (max-width:100% won't shrink it),
-    // keeping the wide journey table on one page instead of wrapping/overflowing.
-    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:820,scrollX:0,scrollY:0},
+    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0},
     jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-    pagebreak:{mode:['css','legacy'],before:'.doc',avoid:['tr']}
+    // page breaks come from CSS (.doc + .doc) so there's no blank leading page
+    pagebreak:{mode:['css','legacy'],avoid:['tr']}
   };
-  return window.html2pdf().set(opt).from($('#sheetBody')).outputPdf('blob');
+  // Lock the sheet to a fixed pixel width while capturing so the document renders
+  // at a predictable size on every device (phone/APK included). Without this,
+  // max-width:100% shrinks it on narrow screens and html2pdf's width math
+  // misaligns the page (content shifted / clipped). Restored right after.
+  const sb=$('#sheetBody');
+  sb.classList.add('pdfexport');
+  const done=()=>sb.classList.remove('pdfexport');
+  return window.html2pdf().set(opt).from(sb).outputPdf('blob').then(
+    b=>{ done(); return b; },
+    e=>{ done(); throw e; }
+  );
 }
 
 /* ---- Deliver a blob: share via the OS, or save/download ---- */
