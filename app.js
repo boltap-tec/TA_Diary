@@ -298,7 +298,8 @@ function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0
    keeps their own; stored on the device keyed by email. ----- */
 const SETTINGS_DEFAULTS = { font:"'Times New Roman', serif", size:'12px',
   visit:false, autofillTime:false, autofillMode:false, stickyMode:false,
-  showDiary:true, autofillTaShort:false, autoTaFromDetail:false, timeSource:'own' };
+  showDiary:true, autofillTaShort:false, autoTaFromDetail:false, timeSource:'own',
+  taFormat:'1' };
 function userSettings(email){
   const all = LS.get('ta_user_settings', {});
   let s = all[email];
@@ -1080,6 +1081,18 @@ function docTA(){
   const words=numWords(Math.round(net));
   const dailyWords=numWords(Math.round(t.daily));
 
+  // Format 2 (optional, per-officer setting): a CERTIFICATE block above the Tour Certificate.
+  // Signatory block is fixed text (Karur Division) as requested; name/designation are dynamic.
+  const taFormat = userSettings(DB.active).taFormat || '1';
+  const certBlock = taFormat==='2' ? `
+    <hr>
+    <div class="center" style="font-weight:700">CERTIFICATE</div>
+    <p class="small" style="margin:8px 0 0">This is to certify that Shri., <b>${esc(p.name)}</b>, <b>${esc(p.desg)}</b> , made journeys on the above mentioned dates.</p>
+    <div class="right" style="margin-top:64px">/अधीक्षक डाकघर/ <b>Supdt. of Post Offices,</b>/</div>
+    <div class="right" style="margin-top:6px">/ करूर डिवीजन/ <b>Karur&nbsp; Division,</b> करूर/<b>Karur-639001/</b></div>
+    <div class="kv" style="margin-top:14px">Place :&nbsp; Karur</div>
+    <div class="kv">Date :</div>` : '';
+
   const page1=`<div class="doc">
     <table class="nb"><tr>
       <td style="width:33%">G.A.R 14-A</td><td class="center">CENTRAL &nbsp; Sub-bill (Tour)</td>
@@ -1121,6 +1134,7 @@ function docTA(){
     </table>
     <div class="kv" style="margin-top:6px"><b>RS. <span id="taNet2">${net.toFixed(2)}</span> /-</b> ( <span id="taWords">${esc(words)}</span> Only )</div>
     <div class="kv small">Amount of Advance of Travelling Allowances, if any, Drawn — Rs. <span id="taAdvDrawn">${advance>0?advance.toFixed(2):'Nil'}</span>/-</div>
+    ${certBlock}
     <hr>
     <div style="font-weight:700">TOUR CERTIFICATE</div>
     <ol class="small">
@@ -1452,6 +1466,7 @@ function openSettings(){
   $('#setDiary').checked      = s.showDiary;
   $('#setAutoTa').checked     = s.autoTaFromDetail;
   $('#setTimeSource').value   = s.timeSource || 'own';
+  $('#setTaFormat').value     = s.taFormat || '1';
   $('#setWhose').textContent  = 'These settings apply to ' + (DB.p?.name || DB.active || 'this officer') + ' only.';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
@@ -1488,6 +1503,8 @@ $('#setDiary').onchange       =()=>{ setUserSetting(DB.active,'showDiary',$('#se
   toast($('#setDiary').checked ? 'Diary fields shown' : 'Diary fields hidden'); };
 $('#setFont').onchange=saveFont;
 $('#setFontSize').onchange=saveFont;
+$('#setTaFormat').onchange   =()=>{ setUserSetting(DB.active,'taFormat',$('#setTaFormat').value);
+  toast('TA Bill format '+$('#setTaFormat').value+' selected'); };
 // Unified PIN change — works in both cloud (Supabase password) and local (device PIN) modes.
 async function changePin(newPin){
   if(!/^\d{4,8}$/.test(newPin)) return {ok:false, msg:'PIN must be 4–8 digits.'};
