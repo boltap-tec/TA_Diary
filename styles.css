@@ -346,10 +346,15 @@ textarea{resize:vertical}
   .sheet{position:static;background:#fff}
   .sheet-body{padding:0;display:block}
   .sheet-body .doc{min-height:0}
-  .sheet-body .doc.partb{min-height:250mm}   /* PART-B still fills its own page in the PDF */
-  .doc{box-shadow:none;width:auto;padding:0;font-size:11.5px;page-break-after:always}
+  .sheet-body .doc.partb{min-height:0}   /* size to content so PART-B never spills onto a 2nd page */
+  .doc{box-shadow:none;width:auto;max-width:none;margin:0;padding:0;font-size:11.5px;page-break-after:always}
   .doc:last-child{page-break-after:auto}
-  tr,thead,.sign,ol,table{page-break-inside:avoid}   /* keep rows/blocks whole — no half pages */
+  /* fixed layout keeps every table exactly full-width and wraps long text,
+     so the sheet stays aligned to both left and right margins */
+  .doc table{table-layout:fixed}
+  .doc th,.doc td{word-wrap:break-word;overflow-wrap:anywhere}
+  .doc .dtcell{white-space:normal}
+  tr,thead,.sign,ol{page-break-inside:avoid}   /* keep rows/blocks whole — no half pages */
   .doc .docinp{border:none;border-radius:0;padding:0;background:transparent;-webkit-appearance:none;appearance:none}
   @page{size:A4;margin:12mm}
 }
