@@ -230,7 +230,7 @@ textarea{resize:vertical}
    text, so the 9-column journey table can't overflow past the right margin
    (was clipping the Purpose column in the PDF). */
 .doc table{width:100%;border-collapse:collapse;margin:8px 0;table-layout:fixed}
-.doc th,.doc td{border:1px solid #000;padding:4px 6px;font-size:.92em;vertical-align:top;background:#fff;word-wrap:break-word;overflow-wrap:anywhere}
+.doc th,.doc td{border:1px solid #000;padding:4px 6px;font-size:.92em;vertical-align:top;background:#fff;word-wrap:break-word;overflow-wrap:break-word}
 .doc th{text-align:center;font-size:.86em;font-weight:700;background:#fff}
 .doc .tot td{font-weight:700;background:#fff}
 .doc .dtcell{white-space:normal}
