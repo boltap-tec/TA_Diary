@@ -234,11 +234,16 @@ textarea{resize:vertical}
 .doc th{text-align:center;font-size:.86em;font-weight:700;background:#fff}
 .doc .tot td{font-weight:700;background:#fff}
 .doc .dtcell{white-space:normal}
+/* Diary tables keep the original auto layout / natural wrapping (the fixed-layout
+   change above is only for the TA Bill). Restores the previous Diary look. */
+.doc table.diaryjt,.doc table.desct{table-layout:auto}
+.doc table.diaryjt th,.doc table.diaryjt td,.doc table.desct th,.doc table.desct td{overflow-wrap:normal;word-wrap:normal}
+.doc table.diaryjt .dtcell{white-space:nowrap}
 /* diary description table (no fills) */
 .doc table.desct td{padding:5px 7px;background:#fff}
-.doc table.desct .dd-date{white-space:nowrap;font-weight:700;width:96px}
-.doc table.desct .dd-day{white-space:nowrap;width:80px}
-.doc table.desct .dd-place{font-weight:700;width:150px}
+.doc table.desct .dd-date{white-space:nowrap;font-weight:700;width:90px}
+.doc table.desct .dd-date .dd-wd{font-weight:400;font-size:.9em;color:#333}
+.doc table.desct .dd-place{font-weight:700;width:120px}
 .doc .small{font-size:.84em}
 .doc .num{text-align:right}
 /* Editable Hotel / Advance fields inside the TA Bill */

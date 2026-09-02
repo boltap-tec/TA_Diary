@@ -1217,11 +1217,10 @@ function docDiary(){
     else place = isLeave(e.today) ? (e.leaveType||e.today) : 'Holiday';
     const details = e.diaryDetail || e.purpose || '';
     return `<tr>
-      <td class="dd-date">${fmtDate(e.fromDate)}</td>
-      <td class="dd-day">${weekday(e.fromDate)}</td>
+      <td class="dd-date">${fmtDate(e.fromDate)}<br><span class="dd-wd">${weekday(e.fromDate)}</span></td>
       <td class="dd-place">${esc(place)}</td>
       <td>${esc(details)}</td></tr>`;
-  }).join('') || `<tr><td colspan="4" class="center muted">No entries in this period</td></tr>`;
+  }).join('') || `<tr><td colspan="3" class="center muted">No entries in this period</td></tr>`;
 
   const journeys=es.filter(e=>isField(e.today));
   const rows=journeys.map(e=>`<tr>
@@ -1242,13 +1241,13 @@ function docDiary(){
     <div class="kv">3. Headquarters &nbsp;: <b>${esc(p.parent)} - ${esc(p.pincode)}</b></div>
     <div style="font-weight:700;margin:12px 0 6px">DESCRIPTION :</div>
     <table class="desct">
-      <thead><tr><th>Date</th><th>Day</th><th>Place</th><th>Details of work / journey</th></tr></thead>
+      <thead><tr><th>Date</th><th>Place/Office</th><th>Details of work / journey</th></tr></thead>
       <tbody>${descRows}</tbody>
     </table>
     <div style="font-weight:700;margin:16px 0 4px">Journey Details</div>
-    <table>
-      <colgroup><col style="width:12%"><col style="width:15%"><col style="width:12%"><col style="width:15%">
-        <col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:17%"></colgroup>
+    <table class="diaryjt">
+      <colgroup><col style="width:10%"><col style="width:15%"><col style="width:10%"><col style="width:15%">
+        <col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:23%"></colgroup>
       <thead>
         <tr><th>-1</th><th>-2</th><th>-3</th><th>-4</th><th>-5</th><th>-6</th><th>-7</th><th>-8</th><th>-9</th></tr>
         <tr><th>Date &amp; Time From</th><th>From Office/Place</th><th>Date &amp; Time To</th><th>To Office/Place</th><th>Mode</th><th>Dist Km</th><th>Fare</th><th>Days</th><th>Purpose of visit</th></tr>
