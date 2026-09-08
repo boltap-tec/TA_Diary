@@ -29,6 +29,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);
 h2{font-size:16px;margin:0;font-weight:700;letter-spacing:-.01em}
 input,select,textarea,button{font-family:inherit;font-size:15px}
 
+/* ---------- Designer credit (top of app) ---------- */
+.topcredit{font-size:11px;text-align:center;padding:5px 10px;color:#fff;letter-spacing:.02em;
+  background:linear-gradient(135deg,var(--brand),var(--brand-2))}
+.topcredit b{font-weight:800}
+.login-credit{margin:14px 0 0;text-align:center;font-size:11.5px;color:var(--muted)}
+.login-credit b{color:var(--brand);font-weight:800}
+
 /* ---------- App bar ---------- */
 .appbar{position:sticky;top:0;z-index:20;background:var(--card);
   display:flex;align-items:center;justify-content:space-between;
@@ -394,7 +401,8 @@ textarea{resize:vertical}
 .admin-user{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f7f8fa;
   border:1px solid var(--line);border-radius:11px;padding:9px 11px}
 .admin-user .ur-desg{font-size:11px;color:var(--muted)}
-.au-actions{display:flex;gap:6px;flex:0 0 auto}
+.ur-role{font-size:10.5px;font-weight:700;color:var(--brand);background:#fbe7e7;border-radius:20px;padding:1px 8px;margin-left:4px}
+.au-actions{display:flex;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
 
 /* ---------- Print: no background colours ---------- */
 @media print{

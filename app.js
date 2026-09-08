@@ -29,7 +29,12 @@ const DB = {
 const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const ADMIN = 'arulece05@gmail.com';   // only admin may switch officers / manage users
+const ADMIN = 'arulece05@gmail.com';   // super-admin: switch officers / manage users / view PINs
+// Sub-admin = a "profile controller": a normal user who may ALSO create new officers + PINs,
+// but has no other admin power and cannot view other users' PINs.
+const isSuperAdmin = () => DB.active===ADMIN;
+const isSubAdmin   = () => !!(DB.p && DB.p.is_sub_admin);
+const canManageProfiles = () => isSuperAdmin() || isSubAdmin();
 
 /* =========================================================
    SUPABASE CLOUD LAYER (optional, gated by config.USE_AUTH)
@@ -62,7 +67,7 @@ const visitToRow = v => ({id:v.id,email:v.email,date:v.date||null,office:v.offic
   apt_dtr:v.aptDtr||'',bo_bal:v.boBal||'',disc:v.disc||'',purpose:v.purpose||'',result:v.result||''});
 const rowToProfile = r => ({email:r.email,name:r.name||'',desg:r.designation||'',basic:r.basic||'',parent:r.parent_office||'',pincode:r.pincode||'',
   daily:+r.daily_ta_fare||0,mileage:+r.mileage_fare||0,maxBike:+r.max_bike||0,submitTo:r.submit_to||'',every:r.submit_every||'Fortnight',
-  pin:r.pin||'',is_admin:!!r.is_admin,is_blocked:!!r.is_blocked});
+  pin:r.pin||'',is_admin:!!r.is_admin,is_sub_admin:!!r.is_sub_admin,is_blocked:!!r.is_blocked,settings:(r.settings&&typeof r.settings==='object')?r.settings:null});
 async function sbSetProfilePin(email,pin){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').update({pin}).eq('email',email); }catch(e){ console.warn('pin sync',e.message); } }
 const profileToRow = p => ({email:p.email,name:p.name||'',designation:p.desg||'',basic:p.basic||'',parent_office:p.parent||'',pincode:p.pincode||'',
   daily_ta_fare:+p.daily||0,mileage_fare:+p.mileage||0,max_bike:+p.maxBike||0,submit_to:p.submitTo||'',submit_every:p.every||'Fortnight'});
@@ -94,7 +99,7 @@ async function sbPull(){
     ]);
     { const m={}; offs.forEach(o=>m[(o.name||'').toLowerCase()]=o.pincode); (window.TA_SEED=window.TA_SEED||{}).officePins=m; }
     { const m={}; rts.forEach(r=>m[(r.office_from||'').toLowerCase()+'||'+(r.office_to||'').toLowerCase()]={d:+r.distance||0,f:+r.fare||0}); (window.TA_SEED=window.TA_SEED||{}).routes=m; }
-    if(profs.length) DB.profiles = profs.map(rowToProfile);
+    if(profs.length){ DB.profiles = profs.map(rowToProfile); hydrateSettingsFromProfiles(); }
     DB.allE = ents.map(rowToEntry);
     DB.allV = vis.map(rowToVisit);
   }catch(e){ console.warn('sbPull failed (using cached data):', e.message); }
@@ -105,7 +110,30 @@ async function sbDeleteEntry(id){ const c=sbClient(); if(!sbOn()) return; try{ a
 async function sbUpsertVisit(v){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_visits').upsert(visitToRow(v)); }catch(err){ console.warn('visit sync',err.message); } }
 async function sbDeleteVisit(id){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_visits').delete().eq('id',id); }catch(err){} }
 async function sbUpsertProfile(p){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').upsert(profileToRow(p)); }catch(err){ console.warn('profile sync',err.message); } }
+// Per-user settings live on the officer's ta_profiles row (jsonb `settings`) so they
+// follow the user to any browser/device instead of being stuck in one browser's localStorage.
+async function sbSaveSettings(email,settings){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').update({settings}).eq('email',email); }catch(err){ console.warn('settings sync',err.message); } }
+// Copy cloud settings into the local cache so userSettings()/applyFont() read them.
+function hydrateSettingsFromProfiles(){
+  const all = LS.get('ta_user_settings', {}); let changed=false;
+  DB.profiles.forEach(p=>{ if(p.settings && typeof p.settings==='object'){ all[p.email]={ ...SETTINGS_DEFAULTS, ...p.settings }; changed=true; } });
+  if(changed) LS.set('ta_user_settings', all);
+}
 async function sbSetBlocked(email,val){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').update({is_blocked:val}).eq('email',email); }catch(err){} }
+async function sbSetSubAdmin(email,val){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').update({is_sub_admin:val}).eq('email',email); }catch(err){ console.warn('sub_admin sync',err.message); } }
+// Create a Supabase Auth login for a new officer WITHOUT disturbing the current
+// session — uses a throwaway client that persists nothing. Needs "Confirm email"
+// OFF and email signups enabled in the Supabase project.
+async function sbCreateLogin(email,pin){
+  const c=window.TA_CONFIG||{};
+  if(!(window.supabase && c.SUPABASE_URL && c.SUPABASE_ANON_KEY)) return {ok:false,msg:'cloud mode is off'};
+  try{
+    const tmp=window.supabase.createClient(c.SUPABASE_URL,c.SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+    const {error}=await tmp.auth.signUp({email,password:pinToPass(pin||'1234')});
+    if(error){ if(/registered|already|exists/i.test(error.message)) return {ok:true,existed:true}; return {ok:false,msg:error.message}; }
+    return {ok:true};
+  }catch(e){ return {ok:false,msg:e.message}; }
+}
 async function sbDeleteProfile(email){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').delete().eq('email',email); }catch(err){} }
 
 /* ---------------- PIN / login / access ---------------- */
@@ -314,6 +342,7 @@ function setUserSetting(email, key, val){
   const all = LS.get('ta_user_settings', {});
   all[email] = { ...SETTINGS_DEFAULTS, ...userSettings(email), [key]:val };
   LS.set('ta_user_settings', all);
+  sbSaveSettings(email, all[email]);   // persist to the cloud so it follows the user across browsers
 }
 const visitOn = email => userSettings(email).visit;
 function applyVisitVisibility(){
@@ -651,7 +680,18 @@ function applyContextToForm(){
     const prev = sortEntries(DB.e).reverse().find(e=>isField(e.today) && (e.taShort||'').trim());
     if(prev) $('#fTaShort').value = prev.taShort;
   }
+  // Next trip on the same date: default From time to the time you last got back
+  // (the previous leg's To time). The officer can still adjust it.
+  if(isField(curToday) && !$('#fFromTime').dataset.touched && !$('#fFromTime').value){
+    const last = lastReachedTimeOnDate(nd, null);
+    if(last) $('#fFromTime').value = last;
+  }
   showFromDay(); updateComplete();
+}
+// Latest To-time already recorded among this date's field legs (excludes the row being edited).
+function lastReachedTimeOnDate(date, excludeId){
+  return DB.e.filter(e=>isField(e.today) && e.id!==excludeId && e.fromDate===date && e.toTime)
+             .reduce((mx,e)=> e.toTime>mx ? e.toTime : mx, '');
 }
 function showFromDay(){
   $('#fromDay').textContent = $('#fFromDate').value ? '· '+weekday($('#fFromDate').value) : '';
@@ -735,6 +775,18 @@ $('#btnSaveEntry').onclick=()=>{
   if(!DB.p){ toast('Set up a Profile first'); go('profile'); return; }
   const ctx=computeContext();
   const leave=isLeave(curToday), holiday=curToday==='Holiday', office=isOffice(curToday);
+  // Time sanity checks for field trips (times are HH:MM, so string compare works)
+  if(!office && !holiday && !leave){
+    const fd=$('#fFromDate').value, td=$('#fToDate').value||fd;
+    const ft=$('#fFromTime').value, tt=$('#fToTime').value;
+    const lastT=lastReachedTimeOnDate(fd, editingId);
+    if(ft && lastT && ft < lastT){
+      toast(`From time can't be before ${lastT} — your last trip on ${fmtDate(fd)} ended then.`); return;
+    }
+    if(ft && tt && fd===td && tt < ft){
+      toast('To time can\'t be before From time on the same date.'); return;
+    }
+  }
   const leaveTypeVal = $('#fLeaveType').value.trim() || 'Leave';
   const today = leave ? 'Leave' : curToday;   // canonical category; custom label kept in leaveType
   const mode = office ? '' : getMode();
@@ -916,12 +968,18 @@ function loadProfileForm(){
   $('#pEmail').value=p.email||''; $('#pParent').value=p.parent||''; $('#pPincode').value=p.pincode||'';
   $('#pDaily').value=p.daily||''; $('#pMileage').value=p.mileage||''; $('#pMaxBike').value=p.maxBike||'';
   $('#pSubmitTo').value=p.submitTo||''; $('#pEvery').value=p.every||'Fortnight';
+  // Only the admin / a sub-admin (profile controller) may add new officers + set their PIN.
+  const mgr=canManageProfiles();
+  $('#btnNewProfile').style.display = mgr?'':'none';
+  $('#pPinField').style.display     = mgr?'block':'none';
+  $('#pPin').value='';
 }
 $('#btnNewProfile').onclick=()=>{
-  ['#pName','#pDesg','#pBasic','#pEmail','#pParent','#pPincode','#pDaily','#pMileage','#pMaxBike','#pSubmitTo'].forEach(s=>$(s).value='');
+  if(!canManageProfiles()){ toast('Only the admin or a sub-admin can add new officers'); return; }
+  ['#pName','#pDesg','#pBasic','#pEmail','#pParent','#pPincode','#pDaily','#pMileage','#pMaxBike','#pSubmitTo','#pPin'].forEach(s=>$(s).value='');
   $('#pName').focus(); toast('Enter details for the new officer');
 };
-$('#btnSaveProfile').onclick=()=>{
+$('#btnSaveProfile').onclick=async ()=>{
   const p={
     name:$('#pName').value.trim(), desg:$('#pDesg').value.trim(), basic:$('#pBasic').value.trim(),
     email:$('#pEmail').value.trim()||('user_'+uid()+'@local'),
@@ -930,6 +988,25 @@ $('#btnSaveProfile').onclick=()=>{
     submitTo:$('#pSubmitTo').value.trim(), every:$('#pEvery').value,
   };
   if(!p.name){ toast('Please enter a name'); return; }
+  const emailLc=(p.email||'').toLowerCase();
+  const isNew=!DB.profiles.some(x=>(x.email||'').toLowerCase()===emailLc);
+
+  if(isNew){
+    if(!canManageProfiles()){ toast('Only the admin or a sub-admin can add new officers'); return; }
+    const pin=($('#pPin').value.trim())||'1234';
+    // Register the new officer WITHOUT switching away from the manager who's adding them.
+    DB.profiles=[...DB.profiles.filter(x=>(x.email||'').toLowerCase()!==emailLc), p];
+    setPin(p.email,pin);
+    if(sbOn()){
+      toast('Creating login…');
+      await sbUpsertProfile(p);            // create the profile row first…
+      await sbSetProfilePin(p.email,pin);  // …then store the admin-visible PIN
+      const r=await sbCreateLogin(p.email,pin);
+      toast(r.ok ? `Officer added ✓ — login PIN ${pin}` : ('Profile saved, but login not created: '+(r.msg||'')+' — run create_users.sql or check Supabase Auth settings.'));
+    } else { sbUpsertProfile(p); toast(`Officer added ✓ — PIN ${pin}`); }
+    $('#pPin').value=''; renderHeader(); go('home'); return;
+  }
+  // Editing the current officer's own profile (unchanged behaviour).
   DB.saveProfile(p); sbUpsertProfile(p); renderHeader(); toast('Profile saved ✓'); go('home');
 };
 
@@ -1569,14 +1646,24 @@ function renderAdminSettings(){
   $('#setResetUser').innerHTML=ps.map(p=>`<option value="${esc(p.email)}">${esc(p.name)} — ${esc(p.email)}${blocked.includes(p.email)?' (BLOCKED)':''}</option>`).join('');
   $('#adminUsers').innerHTML=ps.filter(p=>p.email!==ADMIN).map(p=>`
     <div class="admin-user">
-      <span><b>${esc(p.name)}</b><br><span class="ur-desg">${esc(p.email)}${blocked.includes(p.email)?' · BLOCKED':''}</span>
+      <span><b>${esc(p.name)}</b>${p.is_sub_admin?' <span class="ur-role">🛡️ Sub-admin</span>':''}<br><span class="ur-desg">${esc(p.email)}${blocked.includes(p.email)?' · BLOCKED':''}</span>
         <br><span class="ur-pin">🔑 PIN: <b>${esc(p.pin||getPin(p.email))}</b></span></span>
       <span class="au-actions">
+        <button class="mini" data-subadmin="${esc(p.email)}">${p.is_sub_admin?'Remove sub-admin':'Make sub-admin'}</button>
         <button class="mini" data-block="${esc(p.email)}">${blocked.includes(p.email)?'Unblock':'Block'}</button>
         <button class="mini del" data-remove="${esc(p.email)}">Remove</button>
       </span></div>`).join('') || '<span class="hint">No other users.</span>';
+  $$('#adminUsers [data-subadmin]').forEach(b=>b.onclick=()=>toggleSubAdmin(b.dataset.subadmin));
   $$('#adminUsers [data-block]').forEach(b=>b.onclick=()=>toggleBlock(b.dataset.block));
   $$('#adminUsers [data-remove]').forEach(b=>b.onclick=()=>removeUser(b.dataset.remove));
+}
+// Grant / revoke the "sub-admin" (profile controller) role. Super-admin only.
+function toggleSubAdmin(email){
+  const arr=DB.profiles; const p=arr.find(x=>x.email===email); if(!p) return;
+  p.is_sub_admin=!p.is_sub_admin; DB.profiles=arr;   // persist to local cache
+  sbSetSubAdmin(email, p.is_sub_admin);
+  renderAdminSettings();
+  toast(p.is_sub_admin?'Granted sub-admin — can add officers':'Removed sub-admin');
 }
 $('#setAddHw').onclick=()=>{ const v=$('#setNewHw').value.trim(); if(!v)return; const a=LS.get('ta_hw_extra',[]); a.push(v); LS.set('ta_hw_extra',a); $('#setNewHw').value=''; renderAdminSettings(); buildVisitControls(); toast('Hardware module added'); };
 $('#setAddSw').onclick=()=>{ const v=$('#setNewSw').value.trim(); if(!v)return; const a=LS.get('ta_sw_extra',[]); a.push(v); LS.set('ta_sw_extra',a); $('#setNewSw').value=''; renderAdminSettings(); buildVisitControls(); toast('Software module added'); };

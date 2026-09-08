@@ -12,6 +12,9 @@
 </head>
 <body>
 
+<!-- Designer credit — shown at the very top of the app -->
+<div class="topcredit no-print">Designed by <b>Arul.M</b>, DSM, Karur</div>
+
 <!-- ============ LOGIN ============ -->
 <div class="login" id="loginView">
   <div class="login-card">
@@ -25,6 +28,7 @@
     <input id="loginPin" type="text" class="pinmask" inputmode="numeric" maxlength="8" placeholder="Default PIN is 1234" autocomplete="off" autocorrect="off" data-form-type="other">
     <button class="btn primary block" id="loginBtn">Sign in</button>
     <p class="login-hint" id="loginMsg">Default PIN is <b>1234</b>. You can change it anytime in Profile. Forgot it? Ask the admin.</p>
+    <p class="login-credit">Designed by <b>Arul.M</b>, DSM, Karur</p>
   </div>
 </div>
 
@@ -310,6 +314,11 @@
       </div>
     </div>
     <div class="field"><label>Diary submitted to</label><input id="pSubmitTo" placeholder="e.g. The SPO's, Karur Division"></div>
+    <div class="field" id="pPinField" style="display:none">
+      <label>Login PIN for a NEW officer</label>
+      <input id="pPin" class="pinmask" inputmode="numeric" maxlength="8" placeholder="Default 1234" autocomplete="off" data-form-type="other">
+      <p class="hint" style="margin:4px 0 0">Sets the sign-in PIN when adding a new officer. Leave blank for 1234. (Not used when editing an existing profile.)</p>
+    </div>
     <div class="form-actions">
       <button class="btn ghost" id="btnNewProfile">＋ New officer</button>
       <button class="btn primary" id="btnSaveProfile">Save profile</button>
