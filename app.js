@@ -264,7 +264,9 @@ function computeContext(){
   //  delete: removing any entry simply recomputes the max — no phantom extra day.)
   const allList = sortEntries(DB.e);
   const lastAll = allList[allList.length - 1];
-  let fromDate = todayISO(), maxTo = '';
+  // For a brand-new user (no entries yet) leave the next date blank so they pick
+  // their own first entry date; after that, it advances from MAX(To_Date)+1.
+  let fromDate = '', maxTo = '';
   if (lastAll){
     maxTo = allList.reduce((mx,e)=>{ const d=e.toDate||e.fromDate||''; return d>mx?d:mx; }, '');
     // The day stays open only if the LAST leg on maxTo is still on tour (return
@@ -402,6 +404,13 @@ function renderNextCard(){
   card.style.display='flex';
   const ctx=computeContext();
   const d=ctx.fromDate;                     // last entered date + 1 (per user)
+  if(!d){                                   // brand-new user: no entries yet — let them pick a date
+    $('#ncMon').textContent='—';
+    $('#ncNum').textContent='＋';
+    $('#ncDay').textContent='First entry';
+    $('#ncNote').textContent='Pick your own date to start';
+    return;
+  }
   const [y,mo,da]=d.split('-');
   $('#ncMon').textContent=MON[+mo-1];
   $('#ncNum').textContent=+da;
@@ -521,9 +530,10 @@ function setToday(v){
   $('#tripFields').style.display='block';
   $('#wrapOffices').style.display   = (holiday||leave)?'none':(office?'block':'grid');
   $('#wrapOfficeTo').style.display  = field?'block':'none';
-  $('#wrapFromDate').style.display  = 'block';               // date shown for ALL categories
-  $('#wrapToDate').style.display    = field?'block':'none';
-  $('#wrapTimes').style.display     = field?'grid':'none';
+  // Order: From date, From time, then To date, To time.
+  $('#wrapFromDT').style.display    = field?'grid':'block';   // From date shown for ALL; block = full width when no From time
+  $('#wrapFromTime').style.display  = field?'block':'none';   // From time only for field trips
+  $('#wrapToDT').style.display      = field?'grid':'none';    // To date + To time only for field trips
   $('#wrapMode').style.display      = field?'grid':'none';
   $('#wrapCompleted').style.display = field?'block':'none';
   $('#completeHint').style.display  = field?'block':'none';
@@ -531,8 +541,8 @@ function setToday(v){
   $('#wrapTaShort').style.display   = field?'block':'none';
   $('#wrapDiaryDetail').style.display = (holiday||leave)?'block':'block';
   $('#lblOfficeFrom').textContent   = office?'At Office':'From Office/Place';
-  $('#lblFromDate').textContent     = field?'From date':'Date';
   $('#lblPurpose').textContent      = office?'Nature of work' : (holiday||leave)?'Note (optional)' : 'Diary detail text';
+  updateDateTimeLabels();
   updateDaysVisibility();
   updateModeFare();
   applyContextToForm();
@@ -634,7 +644,7 @@ function applyTripAutofill(r){
 }
 ['#fOfficeFrom','#fOfficeTo'].forEach(s=>$(s).addEventListener('input',()=>{
   suggestInput($(s), $('#officeList'), allOffices);
-  updateComplete(); autofillDF();
+  updateComplete(); autofillDF(); updateDateTimeLabels();
 }));
 // When the From/To office is CHANGED (picked or edited), refresh the initialised
 // data (distance, fare, and — if their auto-fill is on — times/mode) so stale
@@ -653,6 +663,7 @@ function officeChanged(){
   $('#dfHint').textContent='';
   autofillDF();
   updateComplete();
+  updateDateTimeLabels();
 }
 ['#fOfficeFrom','#fOfficeTo'].forEach(s=>$(s).addEventListener('change', officeChanged));
 $('#fDiaryShort').addEventListener('input',()=>suggestInput($('#fDiaryShort'), $('#shortList'),   shortPoolFn));
@@ -686,7 +697,7 @@ function applyContextToForm(){
     const last = lastReachedTimeOnDate(nd, null);
     if(last) $('#fFromTime').value = last;
   }
-  showFromDay(); updateComplete();
+  showFromDay(); updateComplete(); updateDateTimeLabels();
 }
 // Latest To-time already recorded among this date's field legs (excludes the row being edited).
 function lastReachedTimeOnDate(date, excludeId){
@@ -696,6 +707,20 @@ function lastReachedTimeOnDate(date, excludeId){
 function showFromDay(){
   $('#fromDay').textContent = $('#fFromDate').value ? '· '+weekday($('#fFromDate').value) : '';
   $('#toDay').textContent   = $('#fToDate').value ? '· '+weekday($('#fToDate').value) : '';
+}
+// Date/time labels reflect the place names: e.g. "Karur DO" in From Office makes the
+// From date/time labels read "Karur DO Started — Date/Time", and the To office name
+// makes the To date/time labels read "<place> Reached — Date/Time". Falls back to
+// generic wording when a place hasn't been typed yet.
+function updateDateTimeLabels(){
+  const field = isField(curToday);
+  const from = $('#fOfficeFrom').value.trim();
+  const to   = $('#fOfficeTo').value.trim();
+  if(!field){ $('#lblFromDate').textContent = 'Date'; return; }
+  $('#lblFromDate').textContent = from ? `${from} Started — Date` : 'Started date';
+  $('#lblFromTime').textContent = from ? `${from} Started — Time` : 'Started time';
+  $('#lblToDate').textContent   = to   ? `${to} Reached — Date`   : 'Reached date';
+  $('#lblToTime').textContent   = to   ? `${to} Reached — Time`   : 'Reached time';
 }
 // DA days per govt rule: eligible only if a leg is >8km from HQ; hours = first departure of the
 // date to this leg's To-time. <6h→0.3, 6–12h→0.7, >12h→1.0
@@ -765,7 +790,7 @@ function loadEntryForm(id){
   $('#fCompleted').dataset.touched='1';   // editing: keep the saved choice, don't auto-flip at save
   $('#fDays').value=e.days||'';
   updateDaysVisibility(); updateModeFare(); buildOfficeDatalist();
-  $('#entryContext').classList.remove('show'); showFromDay();
+  $('#entryContext').classList.remove('show'); showFromDay(); updateDateTimeLabels();
 }
 $('#btnDeleteEntry').onclick=()=>{
   if(editingId && confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==editingId); sbDeleteEntry(editingId); editingId=null; toast('Entry deleted'); go('home'); }
@@ -777,14 +802,12 @@ $('#btnSaveEntry').onclick=()=>{
   const leave=isLeave(curToday), holiday=curToday==='Holiday', office=isOffice(curToday);
   // Time sanity checks for field trips (times are HH:MM, so string compare works)
   if(!office && !holiday && !leave){
-    const fd=$('#fFromDate').value, td=$('#fToDate').value||fd;
-    const ft=$('#fFromTime').value, tt=$('#fToTime').value;
+    const fd=$('#fFromDate').value;
+    const ft=$('#fFromTime').value;
     const lastT=lastReachedTimeOnDate(fd, editingId);
     if(ft && lastT && ft < lastT){
-      toast(`From time can't be before ${lastT} — your last trip on ${fmtDate(fd)} ended then.`); return;
-    }
-    if(ft && tt && fd===td && tt < ft){
-      toast('To time can\'t be before From time on the same date.'); return;
+      // Warn only — don't block the save; the officer may have a valid reason.
+      toast(`Note: From time is before ${lastT}, when your last trip on ${fmtDate(fd)} ended.`);
     }
   }
   const leaveTypeVal = $('#fLeaveType').value.trim() || 'Leave';
