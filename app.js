@@ -671,12 +671,20 @@ $('#fTaShort').addEventListener('input',   ()=>{ $('#fTaShort').dataset.touched=
 
 function applyContextToForm(){
   if(editingId) return;
-  const ctx=computeContext(); const box=$('#entryContext');
+  const ctx=computeContext(); const box=$('#entryContext'); const reachNote=$('#reachNote');
+  reachNote.style.display='none';
   const nd = forceDate || ctx.fromDate; forceDate=null;
   $('#fFromDate').value=nd; $('#fToDate').value=nd;   // default next date (or the date picked in Month view)
   if(isLeave(curToday)||curToday==='Holiday'){ box.classList.remove('show'); showFromDay(); return; }
   if(isOffice(curToday)){ $('#fOfficeFrom').value=ctx.parent; box.classList.remove('show'); showFromDay(); return; }
   $('#fOfficeFrom').value=ctx.officeFrom;
+  // Same-date next leg: show, above the From Office, that the officer reached this
+  // place at the previous leg's To time on this date — a reference for the new start.
+  const reached=lastReachedTimeOnDate(nd, editingId);
+  if(reached && ctx.officeFrom){
+    reachNote.style.display='block';
+    reachNote.innerHTML=`📍 Reached <b>${esc(ctx.officeFrom)}</b> at <b>${fmtTime(reached)}</b> on ${fmtDate(nd)} — your next trip starts from here.`;
+  }
   box.classList.add('show');
   box.innerHTML = ctx.ongoing
     ? `🛵 <b>Continuing Trip ${ctx.tripNumber}</b> (Return leg). From <b>${esc(ctx.officeFrom)}</b>. Set "To" = <b>${esc(ctx.parent)}</b> to close the trip.`
@@ -790,7 +798,8 @@ function loadEntryForm(id){
   $('#fCompleted').dataset.touched='1';   // editing: keep the saved choice, don't auto-flip at save
   $('#fDays').value=e.days||'';
   updateDaysVisibility(); updateModeFare(); buildOfficeDatalist();
-  $('#entryContext').classList.remove('show'); showFromDay(); updateDateTimeLabels();
+  $('#entryContext').classList.remove('show'); $('#reachNote').style.display='none';
+  showFromDay(); updateDateTimeLabels();
 }
 $('#btnDeleteEntry').onclick=()=>{
   if(editingId && confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==editingId); sbDeleteEntry(editingId); editingId=null; toast('Entry deleted'); go('home'); }
