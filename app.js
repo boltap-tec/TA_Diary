@@ -258,25 +258,29 @@ function computeContext(){
   const p = DB.p || {};
   const parent = p.parent || 'Parent Office';
 
-  // --- next date: MAX(To_Date) over ALL entries + 1, UNLESS an outside trip on that
-  // last date is still open (return leg pending) — then stay on it to add the return.
-  // (Basing this on the max date, not the last-sorted row, keeps it correct after a
-  //  delete: removing any entry simply recomputes the max — no phantom extra day.)
+  // --- next date: the day AFTER the latest day the officer actually recorded activity.
+  // We anchor on the latest From_Date (the day an entry started) — NOT the max To_Date —
+  // because a stray/oversized To-date on some earlier entry would otherwise push the next
+  // date weeks ahead (e.g. a same-day trip saved with a leftover To-date from a default).
+  // Anchoring on From_Date is also delete-safe: removing any row simply recomputes the max.
   const allList = sortEntries(DB.e);
   const lastAll = allList[allList.length - 1];
-  // For a brand-new user (no entries yet) leave the next date blank so they pick
-  // their own first entry date; after that, it advances from MAX(To_Date)+1.
-  let fromDate = '', maxTo = '';
+  // For a brand-new user (no entries yet) leave the next date blank so they pick their own.
+  let fromDate = '', maxFrom = '';
   if (lastAll){
-    maxTo = allList.reduce((mx,e)=>{ const d=e.toDate||e.fromDate||''; return d>mx?d:mx; }, '');
-    // The day stays open only if the LAST leg on maxTo is still on tour (return
-    // pending). A completed multi-leg day also has an earlier onward leg with
-    // completed='No', so checking *any* leg wrongly kept the next date stuck on
-    // the same day — the next date must advance once the final leg returns to HQ.
-    const legsOnMax = sortEntries(DB.e.filter(e => isField(e.today) && (e.toDate||e.fromDate)===maxTo));
-    const lastLegOnMax = legsOnMax[legsOnMax.length-1];
-    const openTripOnMax = !!(lastLegOnMax && lastLegOnMax.completed!=='Yes');
-    fromDate = openTripOnMax ? maxTo : addDays(maxTo,1);
+    maxFrom = allList.reduce((mx,e)=>{ const d=e.fromDate||''; return d>mx?d:mx; }, '');
+    // A genuine multi-day tour that STARTED on that latest day may end later — honour its
+    // To-date so the next date clears the tour. A same-day timed trip (has both From & To
+    // time) always ends the same day, so its date is From_Date even if a bad To-date lingers.
+    let endDate = maxFrom;
+    DB.e.forEach(e=>{ if((e.fromDate||'')!==maxFrom) return;
+      const td = (e.fromTime && e.toTime) ? (e.fromDate||'') : (e.toDate||e.fromDate||'');
+      if(td>endDate) endDate=td; });
+    // Stay on the latest day only while its final leg is still on tour (return pending).
+    const legsOnLast = sortEntries(DB.e.filter(e => isField(e.today) && (e.fromDate||'')===maxFrom));
+    const lastLegOnLast = legsOnLast[legsOnLast.length-1];
+    const openTripOnLast = !!(lastLegOnLast && lastLegOnLast.completed!=='Yes');
+    fromDate = openTripOnLast ? maxFrom : addDays(endDate,1);
   }
   const lastAllCompleted = !lastAll || lastAll.completed === 'Yes';
 
@@ -329,7 +333,7 @@ function initials(name){ return (name||'?').split(/\s+/).filter(Boolean).slice(0
 const SETTINGS_DEFAULTS = { font:"'Times New Roman', serif", size:'12px',
   visit:false, autofillTime:false, autofillMode:false, stickyMode:false,
   showDiary:true, autofillTaShort:false, autoTaFromDetail:false, timeSource:'own',
-  taFormat:'1' };
+  taFormat:'1', lang:'en' };
 function userSettings(email){
   const all = LS.get('ta_user_settings', {});
   let s = all[email];
@@ -347,6 +351,104 @@ function setUserSetting(email, key, val){
   sbSaveSettings(email, all[email]);   // persist to the cloud so it follows the user across browsers
 }
 const visitOn = email => userSettings(email).visit;
+
+/* ---- Language (English / Tamil) for the app UI. Reports, stored mode/period
+   values and user data stay in their original form; only the on-screen chrome
+   is translated. Strings are keyed by their English text. ---- */
+let CURRENT_LANG = 'en';
+const I18N = { ta: {
+  // Login
+  "Travelling Allowance & Tour Diary":"பயணப்படி & சுற்றுப்பயண நாட்குறிப்பு",
+  "Email / User ID":"மின்னஞ்சல் / பயனர் ID","PIN":"PIN","Sign in":"உள்நுழை",
+  // Header / nav
+  "Tap to switch officer ▾":"அலுவலரை மாற்ற தட்டவும் ▾",
+  "Home":"முகப்பு","Reports":"அறிக்கைகள்","Visit":"வருகை","Profile":"சுயவிவரம்",
+  // Home
+  "This month":"இந்த மாதம்","At HQ":"தலைமையகத்தில்","On tour":"சுற்றுப்பயணத்தில்",
+  "Estimated travelling allowance":"மதிப்பிடப்பட்ட பயணப்படி",
+  "Next diary entry":"அடுத்த நாட்குறிப்பு பதிவு","New":"புதியது","TA Bill":"TA பில்",
+  "Month":"மாதம்","Diary":"நாட்குறிப்பு",
+  "All":"அனைத்தும்","Tour":"சுற்றுப்பயணம்","Office":"அலுவலகம்","Leave":"விடுப்பு",
+  "First entry":"முதல் பதிவு","Pick your own date to start":"தொடங்க உங்கள் தேதியைத் தேர்வுசெய்யவும்",
+  "Entries":"பதிவுகள்","Bike km":"பைக் கி.மீ","DA days":"DA நாட்கள்","Fare":"கட்டணம்",
+  "Setup":"அமைவு","Trip":"பயணம்","Start Trip":"பயணம் தொடங்கு","Continue Trip":"பயணம் தொடர்","Return":"திரும்புதல்","Sunday — Holiday":"ஞாயிறு — விடுமுறை",
+  // Entry form
+  "New daily entry":"புதிய தினசரி பதிவு","Edit entry":"பதிவைத் திருத்து","Today's work":"இன்றைய பணி",
+  "🏢 Office":"🏢 அலுவலகம்","🛵 Outside":"🛵 வெளியில்","🌿 Holiday":"🌿 விடுமுறை","🏖️ Leave":"🏖️ விடுப்பு",
+  "Leave type":"விடுப்பு வகை","From Office/Place":"இருந்து அலுவலகம்/இடம்","To Office/Place":"செல்லும் அலுவலகம்/இடம்",
+  "At Office":"அலுவலகத்தில்","Date":"தேதி","From date":"தொடக்க தேதி","To date":"இறுதி தேதி",
+  "From time":"தொடங்கும் நேரம்","To time":"முடியும் நேரம்","Started date":"தொடங்கிய தேதி","Started time":"தொடங்கிய நேரம்",
+  "Reached date":"சேர்ந்த தேதி","Reached time":"சேர்ந்த நேரம்",
+  "Started":"தொடங்கியது","Reached":"சேர்ந்தது","Time":"நேரம்",
+  "Mode":"போக்குவரத்து முறை","— select —":"— தேர்வு —","Other (type)…":"மற்றவை (தட்டச்சு)…",
+  "Distance (km)":"தூரம் (கி.மீ)","Fare (₹)":"கட்டணம் (₹)",
+  "Diary detail text":"நாட்குறிப்பு விவர உரை","Nature of work":"பணியின் தன்மை","Note (optional)":"குறிப்பு (விருப்பம்)",
+  "Diary short text":"நாட்குறிப்பு சுருக்க உரை","TA short text":"TA சுருக்க உரை",
+  "Trip completed?":"பயணம் முடிந்ததா?","No — still on tour":"இல்லை — இன்னும் சுற்றுப்பயணத்தில்","Yes — returned to HQ":"ஆம் — தலைமையகம் திரும்பியது",
+  "Days (DA)":"நாட்கள் (DA)","Cancel":"ரத்து","Delete":"நீக்கு","Save entry":"பதிவை சேமி",
+  // Month
+  "Day by day":"நாள் வாரியாக","Tap a missing day to add":"விடுபட்ட நாளைச் சேர்க்க தட்டவும்",
+  // Reports
+  "From date":"தொடக்க தேதி","This fortnight":"இந்த பட்சம்","TA Bill (Tour)":"TA பில் (சுற்றுப்பயணம்)",
+  "GAR-14A + food certificate":"GAR-14A + உணவு சான்று","Tour Diary":"சுற்றுப்பயண நாட்குறிப்பு",
+  "Fortnightly diary of journeys":"பயணங்களின் பட்ச நாட்குறிப்பு","Visit Report":"வருகை அறிக்கை",
+  "Office hardware / software status":"அலுவலக வன்பொருள் / மென்பொருள் நிலை",
+  // Visit form
+  "Office Visit Report":"அலுவலக வருகை அறிக்கை","Office visited":"பார்வையிட்ட அலுவலகம்","Pincode":"பின்கோடு",
+  "Visited on":"வருகை தேதி","Reference (if any)":"குறிப்பு (ஏதேனும்)","Hardware":"வன்பொருள்","Software":"மென்பொருள்",
+  "Balance in APT and DTR":"APT மற்றும் DTR இருப்பு","BO Balance in DTR (Manual Daily A/c)":"DTR இல் BO இருப்பு (கையேடு தினசரி கணக்கு)",
+  "Any other discrepancies":"வேறு ஏதேனும் முரண்பாடுகள்","Purpose of visit":"வருகையின் நோக்கம்","Result":"முடிவு",
+  "Save & preview":"சேமித்து முன்னோட்டம்","Saved visit reports":"சேமித்த வருகை அறிக்கைகள்",
+  // Profile
+  "Name":"பெயர்","Designation":"பதவி","Basic pay":"அடிப்படை ஊதியம்","Parent office (HQ)":"தலைமை அலுவலகம் (HQ)",
+  "HQ pincode":"HQ பின்கோடு","Daily DA fare (₹/day)":"தினசரி DA (₹/நாள்)","Mileage fare (₹/km)":"மைலேஜ் கட்டணம் (₹/கி.மீ)",
+  "Max bike distance (km)":"அதிகபட்ச பைக் தூரம் (கி.மீ)","Diary submitted every":"நாட்குறிப்பு சமர்ப்பிப்பு காலம்",
+  "Diary submitted to":"நாட்குறிப்பு சமர்ப்பிக்கப்படும் இடம்","Login PIN for a NEW officer":"புதிய அலுவலருக்கான உள்நுழைவு PIN",
+  "＋ New officer":"＋ புதிய அலுவலர்","Save profile":"சுயவிவரத்தை சேமி","🔒 Change PIN":"🔒 PIN மாற்று",
+  "New PIN (4–8 digits)":"புதிய PIN (4–8 இலக்கங்கள்)","Confirm new PIN":"புதிய PIN உறுதிப்படுத்து","Update PIN":"PIN புதுப்பி",
+  // Report sheet
+  "Report":"அறிக்கை","📤 Share":"📤 பகிர்","🖨 Print":"🖨 அச்சிடு",
+  // User modal
+  "Switch officer":"அலுவலரை மாற்று","Close":"மூடு",
+  // Settings modal
+  "Settings":"அமைப்புகள்","Language":"மொழி","English":"English","தமிழ் (Tamil)":"தமிழ் (Tamil)",
+  "Report font style":"அறிக்கை எழுத்துரு பாணி","Report font size":"அறிக்கை எழுத்துரு அளவு",
+  "TA Bill format":"TA பில் வடிவம்","Enable Office Visit Report":"அலுவலக வருகை அறிக்கையை இயக்கு",
+  "Entry auto-fill":"பதிவு தானியங்கி நிரப்பல்","Copy From / To times from":"தொடக்க/இறுதி நேரங்களை இதிலிருந்து நகலெடு",
+  "My own entries only":"எனது பதிவுகள் மட்டும்","All users' entries":"அனைத்து பயனர்களின் பதிவுகள்",
+  "Auto-fill From / To time from last similar trip":"கடந்த ஒத்த பயணத்திலிருந்து தொடக்க/இறுதி நேரத்தை தானாக நிரப்பு",
+  "Auto-fill Mode from last similar trip":"கடந்த ஒத்த பயணத்திலிருந்து போக்குவரத்து முறையை தானாக நிரப்பு",
+  "Repeat the same date’s mode":"அதே தேதியின் போக்குவரத்து முறையை மீண்டும் பயன்படுத்து",
+  "Auto-fill TA short text from previous date":"முந்தைய தேதியிலிருந்து TA சுருக்க உரையை தானாக நிரப்பு",
+  "Make TA short text from Diary detail":"நாட்குறிப்பு விவரத்திலிருந்து TA சுருக்க உரையை உருவாக்கு",
+  "Diary fields needed":"நாட்குறிப்பு புலங்கள் தேவை",
+  "Change PIN":"PIN மாற்று","🚪 Logout":"🚪 வெளியேறு",
+  // Menu modal
+  "Menu":"பட்டி","⚙️ Settings (font, PIN, admin)":"⚙️ அமைப்புகள் (எழுத்துரு, PIN, நிர்வாகம்)",
+  "⬇️ Export backup (JSON)":"⬇️ காப்புப்பிரதி ஏற்றுமதி (JSON)","📊 Export all data to Excel":"📊 அனைத்து தரவையும் Excel இல் ஏற்றுமதி",
+  "⬆️ Import backup (JSON)":"⬆️ காப்புப்பிரதி இறக்குமதி (JSON)","🔄 Reload sample data (from Excel)":"🔄 மாதிரி தரவை மீளேற்று (Excel)",
+  "🗑️ Clear all data":"🗑️ அனைத்து தரவையும் அழி",
+  // Backup modal
+  "🔔 Weekly backup":"🔔 வாராந்திர காப்புப்பிரதி","Remind me later":"பின்னர் நினைவூட்டு"
+}};
+// Translate one English string to the active language (falls back to English).
+function t(s){ return (CURRENT_LANG==='ta' && I18N.ta[s]) ? I18N.ta[s] : s; }
+// Apply the active language to every tagged element. data-i18n = textContent,
+// data-i18n-ph = placeholder. The English text is the key, so switching back to
+// English just restores the key.
+function applyLang(lang){
+  CURRENT_LANG = (lang==='ta') ? 'ta' : 'en';
+  const map = CURRENT_LANG==='ta' ? I18N.ta : null;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.getAttribute('data-i18n');
+    el.textContent = (map && map[key]) ? map[key] : key;
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    const key = el.getAttribute('data-i18n-ph');
+    el.setAttribute('placeholder', (map && map[key]) ? map[key] : key);
+  });
+  document.documentElement.setAttribute('lang', CURRENT_LANG);
+}
 function applyVisitVisibility(){
   const on = visitOn(DB.active);
   ['#tabVisit','#qVisit','[data-r="visit"]'].forEach(s=>{ const el=$(s); if(el) el.style.display = on?'':'none'; });
@@ -361,6 +463,7 @@ function renderHeader(){
   $('#userName').textContent = p?.name || 'TA Diary';
   $('#userDesg').textContent = p ? ((p.desg||'Officer') + (admin?' ▾':'')) : 'Not signed in';
   applyFont();               // per-user report font
+  applyLang(userSettings(DB.active).lang);   // per-user UI language
   applyVisitVisibility();
   refreshBackupBell();       // weekly backup reminder (admin)
 }
@@ -407,8 +510,8 @@ function renderNextCard(){
   if(!d){                                   // brand-new user: no entries yet — let them pick a date
     $('#ncMon').textContent='—';
     $('#ncNum').textContent='＋';
-    $('#ncDay').textContent='First entry';
-    $('#ncNote').textContent='Pick your own date to start';
+    $('#ncDay').textContent=t('First entry');
+    $('#ncNote').textContent=t('Pick your own date to start');
     return;
   }
   const [y,mo,da]=d.split('-');
@@ -416,9 +519,9 @@ function renderNextCard(){
   $('#ncNum').textContent=+da;
   $('#ncDay').textContent=weekday(d);
   let note=fmtDate(d);
-  if(ctx.ongoing) note+=` · Continue Trip ${ctx.tripNumber} (Return)`;
-  else if(weekday(d)==='Sunday') note+=' · Sunday — Holiday';
-  else note+=` · Start Trip ${ctx.tripNumber}`;
+  if(ctx.ongoing) note+=` · ${t('Continue Trip')} ${ctx.tripNumber} (${t('Return')})`;
+  else if(weekday(d)==='Sunday') note+=` · ${t('Sunday — Holiday')}`;
+  else note+=` · ${t('Start Trip')} ${ctx.tripNumber}`;
   $('#ncNote').textContent=note;
 }
 $('#nextEntry').onclick=()=>{ if(!DB.p) return; editingId=null; go('entry'); };
@@ -428,15 +531,16 @@ function renderHome(){
   renderNextCard();
   const p=DB.p;
   const ctx=computeContext();
-  $('#balStatus').textContent = !p ? 'Setup' : ctx.ongoing ? ('On tour · Trip '+ctx.tripNumber) : 'At HQ';
+  const L = s => (CURRENT_LANG==='ta' && I18N.ta[s]) ? I18N.ta[s] : s;   // local: global t() is shadowed below
+  $('#balStatus').textContent = !p ? L('Setup') : ctx.ongoing ? (L('On tour')+' · '+L('Trip')+' '+ctx.tripNumber) : L('At HQ');
   const t=taOf(monthEntries(), p);
   $('#balPeriod').textContent = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
   animateAmount(t.amount);
   $('#balStats').innerHTML=`
-    ${bstat(monthEntries().length,'Entries')}
-    ${bstat(t.bikeDist.toFixed(0),'Bike km')}
-    ${bstat(t.days.toFixed(1),'DA days')}
-    ${bstat('₹'+t.fare.toFixed(0),'Fare')}`;
+    ${bstat(monthEntries().length,L('Entries'))}
+    ${bstat(t.bikeDist.toFixed(0),L('Bike km'))}
+    ${bstat(t.days.toFixed(1),L('DA days'))}
+    ${bstat('₹'+t.fare.toFixed(0),L('Fare'))}`;
 
   let items=sortEntries(DB.e).reverse();
   if(homeFilter==='Leave') items=items.filter(e=>isLeave(e.today));
@@ -509,7 +613,7 @@ $$('#homeFilter button').forEach(b=>b.onclick=()=>{
 let curToday='Outside';
 function resetEntryForm(){
   editingId=null;
-  $('#entryFormTitle').textContent='New daily entry';
+  $('#entryFormTitle').textContent=t('New daily entry');
   $('#btnDeleteEntry').style.display='none';
   const ctx=computeContext();
   $('#fOfficeTo').value=''; $('#fFromTime').value=''; $('#fToTime').value='';
@@ -540,8 +644,8 @@ function setToday(v){
   $('#wrapDiaryShort').style.display= field?'block':'none';
   $('#wrapTaShort').style.display   = field?'block':'none';
   $('#wrapDiaryDetail').style.display = (holiday||leave)?'block':'block';
-  $('#lblOfficeFrom').textContent   = office?'At Office':'From Office/Place';
-  $('#lblPurpose').textContent      = office?'Nature of work' : (holiday||leave)?'Note (optional)' : 'Diary detail text';
+  $('#lblOfficeFrom').textContent   = office?t('At Office'):t('From Office/Place');
+  $('#lblPurpose').textContent      = office?t('Nature of work') : (holiday||leave)?t('Note (optional)') : t('Diary detail text');
   updateDateTimeLabels();
   updateDaysVisibility();
   updateModeFare();
@@ -683,12 +787,20 @@ function applyContextToForm(){
   const reached=lastReachedTimeOnDate(nd, editingId);
   if(reached && ctx.officeFrom){
     reachNote.style.display='block';
-    reachNote.innerHTML=`📍 Reached <b>${esc(ctx.officeFrom)}</b> at <b>${fmtTime(reached)}</b> on ${fmtDate(nd)} — your next trip starts from here.`;
+    reachNote.innerHTML = CURRENT_LANG==='ta'
+      ? `📍 ${fmtDate(nd)} அன்று <b>${fmtTime(reached)}</b> மணிக்கு <b>${esc(ctx.officeFrom)}</b> சேர்ந்தீர்கள் — உங்கள் அடுத்த பயணம் இங்கிருந்து தொடங்குகிறது.`
+      : `📍 Reached <b>${esc(ctx.officeFrom)}</b> at <b>${fmtTime(reached)}</b> on ${fmtDate(nd)} — your next trip starts from here.`;
   }
   box.classList.add('show');
-  box.innerHTML = ctx.ongoing
-    ? `🛵 <b>Continuing Trip ${ctx.tripNumber}</b> (Return leg). From <b>${esc(ctx.officeFrom)}</b>. Set "To" = <b>${esc(ctx.parent)}</b> to close the trip.`
-    : `🚦 <b>Starting Trip ${ctx.tripNumber}</b> from <b>${esc(ctx.parent)}</b>.`;
+  if(CURRENT_LANG==='ta'){
+    box.innerHTML = ctx.ongoing
+      ? `🛵 <b>பயணம் ${ctx.tripNumber} தொடர்கிறது</b> (திரும்பும் பயணம்). <b>${esc(ctx.officeFrom)}</b> இலிருந்து. பயணத்தை முடிக்க "To" = <b>${esc(ctx.parent)}</b> அமைக்கவும்.`
+      : `🚦 <b>${esc(ctx.parent)}</b> இலிருந்து <b>பயணம் ${ctx.tripNumber} தொடங்குகிறது</b>.`;
+  } else {
+    box.innerHTML = ctx.ongoing
+      ? `🛵 <b>Continuing Trip ${ctx.tripNumber}</b> (Return leg). From <b>${esc(ctx.officeFrom)}</b>. Set "To" = <b>${esc(ctx.parent)}</b> to close the trip.`
+      : `🚦 <b>Starting Trip ${ctx.tripNumber}</b> from <b>${esc(ctx.parent)}</b>.`;
+  }
   // "Repeat the same date's mode": default to the mode already used on this date (any mode).
   if(userSettings(DB.active).stickyMode && !getMode()){
     const sameDay = sortEntries(DB.e).reverse().find(e=>isField(e.today) && e.fromDate===nd && (e.mode||'').trim());
@@ -724,11 +836,12 @@ function updateDateTimeLabels(){
   const field = isField(curToday);
   const from = $('#fOfficeFrom').value.trim();
   const to   = $('#fOfficeTo').value.trim();
-  if(!field){ $('#lblFromDate').textContent = 'Date'; return; }
-  $('#lblFromDate').textContent = from ? `${from} Started — Date` : 'Started date';
-  $('#lblFromTime').textContent = from ? `${from} Started — Time` : 'Started time';
-  $('#lblToDate').textContent   = to   ? `${to} Reached — Date`   : 'Reached date';
-  $('#lblToTime').textContent   = to   ? `${to} Reached — Time`   : 'Reached time';
+  if(!field){ $('#lblFromDate').textContent = t('Date'); return; }
+  const st=t('Started'), rc=t('Reached'), D=t('Date'), T=t('Time');
+  $('#lblFromDate').textContent = from ? `${from} ${st} — ${D}` : t('Started date');
+  $('#lblFromTime').textContent = from ? `${from} ${st} — ${T}` : t('Started time');
+  $('#lblToDate').textContent   = to   ? `${to} ${rc} — ${D}`   : t('Reached date');
+  $('#lblToTime').textContent   = to   ? `${to} ${rc} — ${T}`   : t('Reached time');
 }
 // DA days per govt rule: eligible only if a leg is >8km from HQ; hours = first departure of the
 // date to this leg's To-time. <6h→0.3, 6–12h→0.7, >12h→1.0
@@ -771,17 +884,25 @@ function updateComplete(){
 }
 // Remember which fields the officer typed by hand, so auto-fill / auto-refresh
 // never overwrites a manual value.
-['#fDays','#fDistance','#fFare','#fFromTime','#fToTime'].forEach(s=>
+['#fDays','#fDistance','#fFare','#fFromTime','#fToTime','#fToDate'].forEach(s=>
   $(s).addEventListener('input',()=>{ $(s).dataset.touched='1'; }));
 $('#fMode').addEventListener('change',()=>{ $('#fMode').dataset.touched='1'; });
 $('#fModeCustom').addEventListener('input',()=>{ $('#fMode').dataset.touched='1'; });
+// Keep the To date following the From date until the officer sets To date themselves.
+// This stops a stale To date (e.g. a leftover default) from lingering behind a changed
+// From date and pushing the "next entry" date far ahead.
+$('#fFromDate').addEventListener('input',()=>{
+  if(!$('#fToDate').dataset.touched || $('#fToDate').value < $('#fFromDate').value)
+    $('#fToDate').value = $('#fFromDate').value;
+  showFromDay();
+});
 // Distance now also re-triggers the DA-day calc (previously only time/date did),
 // so days are computed even when distance is filled after marking the trip done.
 ['#fFromTime','#fToTime','#fFromDate','#fToDate','#fDistance'].forEach(s=>$(s).addEventListener('input',updateComplete));
 
 function loadEntryForm(id){
   const e=DB.allE.find(x=>x.id===id); if(!e) return;
-  $('#entryFormTitle').textContent='Edit entry';
+  $('#entryFormTitle').textContent=t('Edit entry');
   $('#btnDeleteEntry').style.display='block';
   let base=e.today; if(isLeave(base)) base='Leave';
   setToday(base);
@@ -789,6 +910,8 @@ function loadEntryForm(id){
   $('#fOfficeFrom').value=e.officeFrom||''; $('#fOfficeTo').value=e.officeTo||'';
   $('#fFromDate').value=e.fromDate||''; $('#fFromTime').value=e.fromTime||'';
   $('#fToDate').value=e.toDate||''; $('#fToTime').value=e.toTime||'';
+  // A real multi-day To date is a deliberate value — keep it from auto-mirroring From date.
+  if(e.toDate && e.toDate!==e.fromDate) $('#fToDate').dataset.touched='1';
   setModeValue(e.mode||''); $('#fDistance').value=e.distance||'';
   $('#fFare').value=e.fare||'';
   $('#fDiaryDetail').value=e.diaryDetail||e.purpose||'';
@@ -1588,6 +1711,7 @@ function openSettings(){
   $('#setAutoTa').checked     = s.autoTaFromDetail;
   $('#setTimeSource').value   = s.timeSource || 'own';
   $('#setTaFormat').value     = s.taFormat || '1';
+  $('#setLang').value         = s.lang || 'en';
   $('#setWhose').textContent  = 'These settings apply to ' + (DB.p?.name || DB.active || 'this officer') + ' only.';
   const admin=DB.active===ADMIN;
   $('#adminSettings').style.display = admin?'block':'none';
@@ -1626,6 +1750,13 @@ $('#setFont').onchange=saveFont;
 $('#setFontSize').onchange=saveFont;
 $('#setTaFormat').onchange   =()=>{ setUserSetting(DB.active,'taFormat',$('#setTaFormat').value);
   toast('TA Bill format '+$('#setTaFormat').value+' selected'); };
+$('#setLang').onchange       =()=>{ const lang=$('#setLang').value; setUserSetting(DB.active,'lang',lang);
+  applyLang(lang);
+  // Re-render dynamic (JS-generated) text so the status chip, next-entry card and
+  // place-aware entry labels pick up the new language right away.
+  if($('#view-home').classList.contains('active')) renderHome();
+  if($('#view-entry').classList.contains('active')) setToday(curToday);
+  toast(lang==='ta' ? 'மொழி: தமிழ்' : 'Language: English'); };
 // Unified PIN change — works in both cloud (Supabase password) and local (device PIN) modes.
 async function changePin(newPin){
   if(!/^\d{4,8}$/.test(newPin)) return {ok:false, msg:'PIN must be 4–8 digits.'};

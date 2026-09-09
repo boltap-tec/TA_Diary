@@ -20,13 +20,13 @@
   <div class="login-card">
     <div class="login-logo">TA</div>
     <h2>TA Diary</h2>
-    <p class="login-sub">Travelling Allowance &amp; Tour Diary</p>
-    <label>Email / User ID</label>
+    <p class="login-sub" data-i18n="Travelling Allowance & Tour Diary">Travelling Allowance &amp; Tour Diary</p>
+    <label data-i18n="Email / User ID">Email / User ID</label>
     <input id="loginEmail" list="emailList" placeholder="you@example.com" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <datalist id="emailList"></datalist>
-    <label>PIN</label>
+    <label data-i18n="PIN">PIN</label>
     <input id="loginPin" type="text" class="pinmask" inputmode="numeric" maxlength="8" placeholder="Default PIN is 1234" autocomplete="off" autocorrect="off" data-form-type="other">
-    <button class="btn primary block" id="loginBtn">Sign in</button>
+    <button class="btn primary block" id="loginBtn" data-i18n="Sign in">Sign in</button>
     <p class="login-hint" id="loginMsg">Default PIN is <b>1234</b>. You can change it anytime in Profile. Forgot it? Ask the admin.</p>
     <p class="login-credit">Designed by <b>Arul.M</b>, DSM, Karur</p>
   </div>
@@ -60,7 +60,7 @@
         <span class="chip chip-live" id="balStatus">At HQ</span>
       </div>
       <div class="balance-amt">₹<span id="balAmount">0</span></div>
-      <div class="balance-sub">Estimated travelling allowance</div>
+      <div class="balance-sub" data-i18n="Estimated travelling allowance">Estimated travelling allowance</div>
       <div class="balance-stats" id="balStats"></div>
     </div>
 
@@ -70,7 +70,7 @@
         <span class="nc-num" id="ncNum">–</span>
       </div>
       <div class="nc-body">
-        <div class="nc-label">Next diary entry</div>
+        <div class="nc-label" data-i18n="Next diary entry">Next diary entry</div>
         <div class="nc-day" id="ncDay">—</div>
         <div class="nc-note" id="ncNote"></div>
       </div>
@@ -78,19 +78,19 @@
     </button>
 
     <div class="quick quick4" id="homeQuick">
-      <button class="quick-btn" data-view="entry" id="qEntry"><span>＋</span>New</button>
-      <button class="quick-btn" data-view="reports"><span>🧾</span>TA Bill</button>
-      <button class="quick-btn" data-view="month"><span>📅</span>Month</button>
-      <button class="quick-btn" data-view="visit" id="qVisit"><span>🖥️</span>Visit</button>
+      <button class="quick-btn" data-view="entry" id="qEntry"><span>＋</span><span class="ib-lbl" data-i18n="New">New</span></button>
+      <button class="quick-btn" data-view="reports"><span>🧾</span><span class="ib-lbl" data-i18n="TA Bill">TA Bill</span></button>
+      <button class="quick-btn" data-view="month"><span>📅</span><span class="ib-lbl" data-i18n="Month">Month</span></button>
+      <button class="quick-btn" data-view="visit" id="qVisit"><span>🖥️</span><span class="ib-lbl" data-i18n="Visit">Visit</span></button>
     </div>
 
     <div class="section-head">
-      <h2>Diary</h2>
+      <h2 data-i18n="Diary">Diary</h2>
       <div class="seg" id="homeFilter">
-        <button data-f="all" class="active">All</button>
-        <button data-f="Outside">Tour</button>
-        <button data-f="Parent_Office">Office</button>
-        <button data-f="Leave">Leave</button>
+        <button data-f="all" class="active" data-i18n="All">All</button>
+        <button data-f="Outside" data-i18n="Tour">Tour</button>
+        <button data-f="Parent_Office" data-i18n="Office">Office</button>
+        <button data-f="Leave" data-i18n="Leave">Leave</button>
       </div>
     </div>
     <div id="entryList" class="list"></div>
@@ -101,17 +101,17 @@
     <div class="form-title" id="entryFormTitle">New daily entry</div>
 
     <div class="field">
-      <label>Today's work</label>
+      <label data-i18n="Today's work">Today's work</label>
       <div class="chips-pick" id="todayWork">
-        <button data-v="Parent_Office">🏢 Office</button>
-        <button data-v="Outside">🛵 Outside</button>
-        <button data-v="Holiday">🌿 Holiday</button>
-        <button data-v="Leave">🏖️ Leave</button>
+        <button data-v="Parent_Office" data-i18n="🏢 Office">🏢 Office</button>
+        <button data-v="Outside" data-i18n="🛵 Outside">🛵 Outside</button>
+        <button data-v="Holiday" data-i18n="🌿 Holiday">🌿 Holiday</button>
+        <button data-v="Leave" data-i18n="🏖️ Leave">🏖️ Leave</button>
       </div>
     </div>
 
     <div class="field" id="leaveTypeField" style="display:none">
-      <label>Leave type</label>
+      <label data-i18n="Leave type">Leave type</label>
       <input id="fLeaveType" list="leaveList" placeholder="Leave / Other — pick or type">
       <datalist id="leaveList">
         <option value="Leave (CL)"></option>
@@ -131,7 +131,7 @@
           <input type="text" id="fOfficeFrom" placeholder="From office / place" list="officeList">
         </div>
         <div class="field" id="wrapOfficeTo">
-          <label id="lblOfficeTo">To Office/Place</label>
+          <label id="lblOfficeTo" data-i18n="To Office/Place">To Office/Place</label>
           <input type="text" id="fOfficeTo" placeholder="To office / place" list="officeList">
         </div>
       </div>
@@ -154,22 +154,22 @@
 
       <div class="grid3" id="wrapMode">
         <div class="field">
-          <label>Mode</label>
+          <label data-i18n="Mode">Mode</label>
           <select id="fMode">
-            <option value="">— select —</option>
+            <option value="" data-i18n="— select —">— select —</option>
             <option>Bike</option><option>Bus</option><option>Train</option>
             <option>Auto</option><option>Jeep</option><option>Car</option><option>Walk</option>
-            <option value="__custom">Other (type)…</option>
+            <option value="__custom" data-i18n="Other (type)…">Other (type)…</option>
           </select>
           <input type="text" id="fModeCustom" placeholder="Type mode" style="display:none;margin-top:8px">
         </div>
         <div class="field" id="wrapDistance">
-          <label>Distance (km) <span class="mini-hint" id="dfHint"></span></label>
+          <label><span data-i18n="Distance (km)">Distance (km)</span> <span class="mini-hint" id="dfHint"></span></label>
           <input type="number" step="0.1" id="fDistance" placeholder="0" list="distList">
           <datalist id="distList"></datalist>
         </div>
         <div class="field" id="wrapFare">
-          <label>Fare (₹)</label>
+          <label data-i18n="Fare (₹)">Fare (₹)</label>
           <input type="number" step="0.5" id="fFare" placeholder="0" list="fareList">
           <datalist id="fareList"></datalist>
         </div>
@@ -184,11 +184,11 @@
         <div class="ocr-status" id="ocrStatus"></div>
       </div>
       <div class="field" id="wrapDiaryShort">
-        <label>Diary short text</label>
+        <label data-i18n="Diary short text">Diary short text</label>
         <input type="text" id="fDiaryShort" placeholder="Short purpose — Diary journey table" list="shortList">
       </div>
       <div class="field" id="wrapTaShort">
-        <label>TA short text</label>
+        <label data-i18n="TA short text">TA short text</label>
         <input type="text" id="fTaShort" placeholder="Short purpose — TA Bill (e.g. Inspn, New S.O)" list="taShortList">
       </div>
       <datalist id="shortList"></datalist>
@@ -196,14 +196,14 @@
 
       <div class="grid2">
         <div class="field" id="wrapCompleted">
-          <label>Trip completed?</label>
+          <label data-i18n="Trip completed?">Trip completed?</label>
           <select id="fCompleted">
-            <option value="No">No — still on tour</option>
-            <option value="Yes">Yes — returned to HQ</option>
+            <option value="No" data-i18n="No — still on tour">No — still on tour</option>
+            <option value="Yes" data-i18n="Yes — returned to HQ">Yes — returned to HQ</option>
           </select>
         </div>
         <div class="field" id="wrapDays">
-          <label>Days (DA) <span class="mini-hint" id="daHint"></span></label>
+          <label><span data-i18n="Days (DA)">Days (DA)</span> <span class="mini-hint" id="daHint"></span></label>
           <input type="number" step="0.1" id="fDays" placeholder="0">
         </div>
       </div>
@@ -211,9 +211,9 @@
     </div>
 
     <div class="form-actions">
-      <button class="btn ghost" id="btnCancelEntry">Cancel</button>
-      <button class="btn danger" id="btnDeleteEntry" style="display:none">Delete</button>
-      <button class="btn primary" id="btnSaveEntry">Save entry</button>
+      <button class="btn ghost" id="btnCancelEntry" data-i18n="Cancel">Cancel</button>
+      <button class="btn danger" id="btnDeleteEntry" style="display:none" data-i18n="Delete">Delete</button>
+      <button class="btn primary" id="btnSaveEntry" data-i18n="Save entry">Save entry</button>
     </div>
   </section>
 
@@ -225,36 +225,36 @@
       <button class="mnav" id="monthNext">›</button>
     </div>
     <div id="monthSummary" class="month-summary"></div>
-    <div class="section-head"><h2>Day by day</h2><span class="hint" style="margin:0">Tap a missing day to add</span></div>
+    <div class="section-head"><h2 data-i18n="Day by day">Day by day</h2><span class="hint" style="margin:0" data-i18n="Tap a missing day to add">Tap a missing day to add</span></div>
     <div id="monthGrid" class="month-list"></div>
   </section>
 
   <!-- ---- REPORTS ---- -->
   <section class="view" id="view-reports">
-    <div class="form-title">Reports</div>
+    <div class="form-title" data-i18n="Reports">Reports</div>
     <div class="grid2">
-      <div class="field"><label>From date</label><input type="date" id="rpFrom"></div>
-      <div class="field"><label>To date</label><input type="date" id="rpTo"></div>
+      <div class="field"><label data-i18n="From date">From date</label><input type="date" id="rpFrom"></div>
+      <div class="field"><label data-i18n="To date">To date</label><input type="date" id="rpTo"></div>
     </div>
     <div class="seg seg-wide" id="rpQuick">
-      <button data-q="thisFN">This fortnight</button>
-      <button data-q="thisMonth">This month</button>
-      <button data-q="all">All</button>
+      <button data-q="thisFN" data-i18n="This fortnight">This fortnight</button>
+      <button data-q="thisMonth" data-i18n="This month">This month</button>
+      <button data-q="all" data-i18n="All">All</button>
     </div>
     <div class="report-cards">
       <button class="report-card" data-r="ta">
         <div class="rc-ico rc-a">🧾</div>
-        <div class="rc-body"><div class="rc-t">TA Bill (Tour)</div><div class="rc-s">GAR-14A + food certificate</div></div>
+        <div class="rc-body"><div class="rc-t" data-i18n="TA Bill (Tour)">TA Bill (Tour)</div><div class="rc-s" data-i18n="GAR-14A + food certificate">GAR-14A + food certificate</div></div>
         <div class="rc-arrow">›</div>
       </button>
       <button class="report-card" data-r="diary">
         <div class="rc-ico rc-b">📓</div>
-        <div class="rc-body"><div class="rc-t">Tour Diary</div><div class="rc-s">Fortnightly diary of journeys</div></div>
+        <div class="rc-body"><div class="rc-t" data-i18n="Tour Diary">Tour Diary</div><div class="rc-s" data-i18n="Fortnightly diary of journeys">Fortnightly diary of journeys</div></div>
         <div class="rc-arrow">›</div>
       </button>
       <button class="report-card" data-r="visit">
         <div class="rc-ico rc-c">🖥️</div>
-        <div class="rc-body"><div class="rc-t">Visit Report</div><div class="rc-s">Office hardware / software status</div></div>
+        <div class="rc-body"><div class="rc-t" data-i18n="Visit Report">Visit Report</div><div class="rc-s" data-i18n="Office hardware / software status">Office hardware / software status</div></div>
         <div class="rc-arrow">›</div>
       </button>
     </div>
@@ -262,81 +262,81 @@
 
   <!-- ---- VISIT REPORT FORM ---- -->
   <section class="view" id="view-visit">
-    <div class="form-title">Office Visit Report</div>
+    <div class="form-title" data-i18n="Office Visit Report">Office Visit Report</div>
     <div class="grid2">
-      <div class="field"><label>Office visited</label><input id="vOffice" placeholder="Office name" list="officeList"></div>
-      <div class="field"><label>Pincode</label><input id="vPincode" placeholder="6-digit"></div>
+      <div class="field"><label data-i18n="Office visited">Office visited</label><input id="vOffice" placeholder="Office name" list="officeList"></div>
+      <div class="field"><label data-i18n="Pincode">Pincode</label><input id="vPincode" placeholder="6-digit"></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Visited on</label><input type="date" id="vDate"></div>
-      <div class="field"><label>Reference (if any)</label><input id="vRef" placeholder="e.g. DO Orders"></div>
+      <div class="field"><label data-i18n="Visited on">Visited on</label><input type="date" id="vDate"></div>
+      <div class="field"><label data-i18n="Reference (if any)">Reference (if any)</label><input id="vRef" placeholder="e.g. DO Orders"></div>
     </div>
 
-    <div class="vgroup-title">🔌 Hardware</div>
+    <div class="vgroup-title">🔌 <span data-i18n="Hardware">Hardware</span></div>
     <div id="vHardware"></div>
-    <div class="vgroup-title">💾 Software</div>
+    <div class="vgroup-title">💾 <span data-i18n="Software">Software</span></div>
     <div id="vSoftware"></div>
 
-    <div class="field"><label>Balance in APT and DTR</label><input id="vAptDtr" value="No issue reported by official"></div>
-    <div class="field"><label>BO Balance in DTR (Manual Daily A/c)</label><input id="vBoBal" value="No issue reported by official"></div>
-    <div class="field"><label>Any other discrepancies</label><textarea id="vDisc" rows="2"></textarea></div>
-    <div class="field"><label>Purpose of visit</label><textarea id="vPurpose" rows="2"></textarea></div>
-    <div class="field"><label>Result</label><textarea id="vResult" rows="2"></textarea></div>
+    <div class="field"><label data-i18n="Balance in APT and DTR">Balance in APT and DTR</label><input id="vAptDtr" value="No issue reported by official"></div>
+    <div class="field"><label data-i18n="BO Balance in DTR (Manual Daily A/c)">BO Balance in DTR (Manual Daily A/c)</label><input id="vBoBal" value="No issue reported by official"></div>
+    <div class="field"><label data-i18n="Any other discrepancies">Any other discrepancies</label><textarea id="vDisc" rows="2"></textarea></div>
+    <div class="field"><label data-i18n="Purpose of visit">Purpose of visit</label><textarea id="vPurpose" rows="2"></textarea></div>
+    <div class="field"><label data-i18n="Result">Result</label><textarea id="vResult" rows="2"></textarea></div>
 
     <div class="form-actions">
-      <button class="btn ghost" id="btnCancelVisit">Cancel</button>
-      <button class="btn primary" id="btnSaveVisit">Save &amp; preview</button>
+      <button class="btn ghost" id="btnCancelVisit" data-i18n="Cancel">Cancel</button>
+      <button class="btn primary" id="btnSaveVisit" data-i18n="Save & preview">Save &amp; preview</button>
     </div>
 
-    <div class="section-head"><h2>Saved visit reports</h2></div>
+    <div class="section-head"><h2 data-i18n="Saved visit reports">Saved visit reports</h2></div>
     <div id="visitList" class="list"></div>
   </section>
 
   <!-- ---- PROFILE ---- -->
   <section class="view" id="view-profile">
-    <div class="form-title">Profile</div>
-    <div class="field"><label>Name</label><input id="pName" placeholder="Full name"></div>
-    <div class="field"><label>Designation</label><input id="pDesg" placeholder="e.g. Inspector of Posts"></div>
+    <div class="form-title" data-i18n="Profile">Profile</div>
+    <div class="field"><label data-i18n="Name">Name</label><input id="pName" placeholder="Full name"></div>
+    <div class="field"><label data-i18n="Designation">Designation</label><input id="pDesg" placeholder="e.g. Inspector of Posts"></div>
     <div class="grid2">
-      <div class="field"><label>Basic pay</label><input id="pBasic" placeholder="e.g. 52000"></div>
-      <div class="field"><label>Email / User ID</label><input id="pEmail" placeholder="you@example.com"></div>
+      <div class="field"><label data-i18n="Basic pay">Basic pay</label><input id="pBasic" placeholder="e.g. 52000"></div>
+      <div class="field"><label data-i18n="Email / User ID">Email / User ID</label><input id="pEmail" placeholder="you@example.com"></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Parent office (HQ)</label><input id="pParent" placeholder="Head quarters office"></div>
-      <div class="field"><label>HQ pincode</label><input id="pPincode" placeholder="6-digit"></div>
+      <div class="field"><label data-i18n="Parent office (HQ)">Parent office (HQ)</label><input id="pParent" placeholder="Head quarters office"></div>
+      <div class="field"><label data-i18n="HQ pincode">HQ pincode</label><input id="pPincode" placeholder="6-digit"></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Daily DA fare (₹/day)</label><input type="number" id="pDaily" placeholder="e.g. 1000"></div>
-      <div class="field"><label>Mileage fare (₹/km)</label><input type="number" step="0.01" id="pMileage" placeholder="e.g. 15"></div>
+      <div class="field"><label data-i18n="Daily DA fare (₹/day)">Daily DA fare (₹/day)</label><input type="number" id="pDaily" placeholder="e.g. 1000"></div>
+      <div class="field"><label data-i18n="Mileage fare (₹/km)">Mileage fare (₹/km)</label><input type="number" step="0.01" id="pMileage" placeholder="e.g. 15"></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Max bike distance (km)</label><input type="number" id="pMaxBike" placeholder="e.g. 500"></div>
-      <div class="field"><label>Diary submitted every</label>
+      <div class="field"><label data-i18n="Max bike distance (km)">Max bike distance (km)</label><input type="number" id="pMaxBike" placeholder="e.g. 500"></div>
+      <div class="field"><label data-i18n="Diary submitted every">Diary submitted every</label>
         <select id="pEvery"><option>Fortnight</option><option>Month</option><option>Week</option></select>
       </div>
     </div>
-    <div class="field"><label>Diary submitted to</label><input id="pSubmitTo" placeholder="e.g. The SPO's, Karur Division"></div>
+    <div class="field"><label data-i18n="Diary submitted to">Diary submitted to</label><input id="pSubmitTo" placeholder="e.g. The SPO's, Karur Division"></div>
     <div class="field" id="pPinField" style="display:none">
-      <label>Login PIN for a NEW officer</label>
+      <label data-i18n="Login PIN for a NEW officer">Login PIN for a NEW officer</label>
       <input id="pPin" class="pinmask" inputmode="numeric" maxlength="8" placeholder="Default 1234" autocomplete="off" data-form-type="other">
       <p class="hint" style="margin:4px 0 0">Sets the sign-in PIN when adding a new officer. Leave blank for 1234. (Not used when editing an existing profile.)</p>
     </div>
     <div class="form-actions">
-      <button class="btn ghost" id="btnNewProfile">＋ New officer</button>
-      <button class="btn primary" id="btnSaveProfile">Save profile</button>
+      <button class="btn ghost" id="btnNewProfile" data-i18n="＋ New officer">＋ New officer</button>
+      <button class="btn primary" id="btnSaveProfile" data-i18n="Save profile">Save profile</button>
     </div>
 
-    <div class="section-head" style="margin-top:24px"><h2>🔒 Change PIN</h2></div>
+    <div class="section-head" style="margin-top:24px"><h2 data-i18n="🔒 Change PIN">🔒 Change PIN</h2></div>
     <div class="field">
-      <label>New PIN (4–8 digits)</label>
+      <label data-i18n="New PIN (4–8 digits)">New PIN (4–8 digits)</label>
       <input id="pNewPin" type="text" class="pinmask" inputmode="numeric" maxlength="8" autocomplete="off" data-form-type="other" placeholder="Enter a new PIN">
     </div>
     <div class="field">
-      <label>Confirm new PIN</label>
+      <label data-i18n="Confirm new PIN">Confirm new PIN</label>
       <input id="pNewPin2" type="text" class="pinmask" inputmode="numeric" maxlength="8" autocomplete="off" data-form-type="other" placeholder="Re-enter the PIN">
     </div>
     <div class="form-actions">
-      <button class="btn primary block" id="btnChangePin">Update PIN</button>
+      <button class="btn primary block" id="btnChangePin" data-i18n="Update PIN">Update PIN</button>
     </div>
     <p class="hint" id="changePinMsg" style="margin-top:8px"></p>
   </section>
@@ -347,11 +347,11 @@
 
 <!-- ============ BOTTOM NAV ============ -->
 <nav class="tabbar">
-  <button class="tab active" data-view="home"><span>🏠</span>Home</button>
-  <button class="tab" data-view="reports"><span>📄</span>Reports</button>
+  <button class="tab active" data-view="home"><span>🏠</span><span class="ib-lbl" data-i18n="Home">Home</span></button>
+  <button class="tab" data-view="reports"><span>📄</span><span class="ib-lbl" data-i18n="Reports">Reports</span></button>
   <button class="tab tab-fab" data-view="entry" id="tabAdd"><span>＋</span></button>
-  <button class="tab" data-view="visit" id="tabVisit"><span>🖥️</span>Visit</button>
-  <button class="tab" data-view="profile"><span>👤</span>Profile</button>
+  <button class="tab" data-view="visit" id="tabVisit"><span>🖥️</span><span class="ib-lbl" data-i18n="Visit">Visit</span></button>
+  <button class="tab" data-view="profile"><span>👤</span><span class="ib-lbl" data-i18n="Profile">Profile</span></button>
 </nav>
 
 <!-- ============ REPORT SHEET ============ -->
@@ -359,9 +359,9 @@
   <div class="sheet-bar no-print">
     <button class="btn ghost" id="sheetClose">←</button>
     <div class="sheet-title" id="sheetTitle">Report</div>
-    <button class="btn ghost" id="sheetShare">📤 Share</button>
+    <button class="btn ghost" id="sheetShare" data-i18n="📤 Share">📤 Share</button>
     <button class="btn ghost" id="sheetWord">⬇ Word</button>
-    <button class="btn ghost" id="sheetPrintNow">🖨 Print</button>
+    <button class="btn ghost" id="sheetPrintNow" data-i18n="🖨 Print">🖨 Print</button>
     <button class="btn primary" id="sheetPrint">⬇ PDF</button>
   </div>
   <div class="sheet-body" id="sheetBody"></div>
@@ -370,18 +370,25 @@
 <!-- ============ USER SWITCH MODAL ============ -->
 <div class="modal" id="userModal" aria-hidden="true">
   <div class="modal-card">
-    <h3>Switch officer</h3>
+    <h3 data-i18n="Switch officer">Switch officer</h3>
     <div id="userList" class="user-list"></div>
-    <button class="btn ghost block" id="userClose">Close</button>
+    <button class="btn ghost block" id="userClose" data-i18n="Close">Close</button>
   </div>
 </div>
 
 <!-- ============ SETTINGS MODAL ============ -->
 <div class="modal" id="settingsModal" aria-hidden="true">
   <div class="modal-card">
-    <h3>Settings</h3>
+    <h3 data-i18n="Settings">Settings</h3>
     <p class="hint" id="setWhose" style="margin:0 0 10px">These settings apply to the signed-in officer only.</p>
-    <label class="set-label">Report font style</label>
+    <label class="set-label" data-i18n="Language">Language</label>
+    <select id="setLang">
+      <option value="en">English</option>
+      <option value="ta">தமிழ் (Tamil)</option>
+    </select>
+    <p class="hint" style="margin:4px 0 0">Changes the app screen language. Reports stay in their standard format.</p>
+    <hr>
+    <label class="set-label" data-i18n="Report font style">Report font style</label>
     <select id="setFont">
       <option value="'Times New Roman', serif">Times New Roman (classic)</option>
       <option value="'Lora', serif">Lora (elegant serif)</option>
@@ -391,7 +398,7 @@
       <option value="'Segoe UI', Arial, sans-serif">Segoe UI (clean sans)</option>
       <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
     </select>
-    <label class="set-label">Report font size</label>
+    <label class="set-label" data-i18n="Report font size">Report font size</label>
     <select id="setFontSize">
       <option value="10.5px">Small</option>
       <option value="12px">Normal</option>
@@ -400,38 +407,38 @@
     </select>
     <div class="set-preview" id="setPreview">Preview — TA Bill &amp; Diary text 123 ₹</div>
     <hr>
-    <label class="set-label">TA Bill format</label>
+    <label class="set-label" data-i18n="TA Bill format">TA Bill format</label>
     <select id="setTaFormat">
       <option value="1">Format 1 — standard (default)</option>
       <option value="2">Format 2 — with CERTIFICATE block</option>
     </select>
     <p class="hint" style="margin:4px 0 0">Format 2 adds a “CERTIFICATE … made journeys on the above mentioned dates” block (with the SPO signatory) above the Tour Certificate.</p>
     <hr>
-    <label class="set-toggle"><input type="checkbox" id="setVisit"> <span>Enable Office Visit Report</span></label>
+    <label class="set-toggle"><input type="checkbox" id="setVisit"> <span data-i18n="Enable Office Visit Report">Enable Office Visit Report</span></label>
     <p class="hint" style="margin:4px 0 0">Adds the “Visit” tab for recording office inspections. Off by default — turn on only if you need it.</p>
     <hr>
-    <label class="set-label">Entry auto-fill</label>
-    <label class="set-toggle"><input type="checkbox" id="setAfTime"> <span>Auto-fill From / To time from last similar trip</span></label>
+    <label class="set-label" data-i18n="Entry auto-fill">Entry auto-fill</label>
+    <label class="set-toggle"><input type="checkbox" id="setAfTime"> <span data-i18n="Auto-fill From / To time from last similar trip">Auto-fill From / To time from last similar trip</span></label>
     <p class="hint" style="margin:4px 0 6px">When the same From &amp; To office was used before, copy its times — including the return leg (To → From).</p>
-    <label class="set-label" style="margin-top:2px">Copy From / To times from</label>
+    <label class="set-label" style="margin-top:2px" data-i18n="Copy From / To times from">Copy From / To times from</label>
     <select id="setTimeSource">
-      <option value="own">My own entries only</option>
-      <option value="all">All users' entries</option>
+      <option value="own" data-i18n="My own entries only">My own entries only</option>
+      <option value="all" data-i18n="All users' entries">All users' entries</option>
     </select>
-    <label class="set-toggle"><input type="checkbox" id="setAfMode"> <span>Auto-fill Mode from last similar trip</span></label>
+    <label class="set-toggle"><input type="checkbox" id="setAfMode"> <span data-i18n="Auto-fill Mode from last similar trip">Auto-fill Mode from last similar trip</span></label>
     <p class="hint" style="margin:4px 0 8px">When the same From &amp; To office was used before, copy its travel mode.</p>
-    <label class="set-toggle"><input type="checkbox" id="setStickyMode"> <span>Repeat the same date’s mode</span></label>
+    <label class="set-toggle"><input type="checkbox" id="setStickyMode"> <span data-i18n="Repeat the same date’s mode">Repeat the same date’s mode</span></label>
     <p class="hint" style="margin:4px 0 8px">New trips on a date default to the mode already used that date (Bike, Bus, Train, …).</p>
-    <label class="set-toggle"><input type="checkbox" id="setAfTa"> <span>Auto-fill TA short text from previous date</span></label>
+    <label class="set-toggle"><input type="checkbox" id="setAfTa"> <span data-i18n="Auto-fill TA short text from previous date">Auto-fill TA short text from previous date</span></label>
     <p class="hint" style="margin:4px 0 8px">Carry forward the TA short text from your most recent entry.</p>
-    <label class="set-toggle"><input type="checkbox" id="setAutoTa"> <span>Make TA short text from Diary detail</span></label>
+    <label class="set-toggle"><input type="checkbox" id="setAutoTa"> <span data-i18n="Make TA short text from Diary detail">Make TA short text from Diary detail</span></label>
     <p class="hint" style="margin:4px 0 8px">Automatically shortens the Diary detail text into the TA short text (recognises words like inspection, verification, new S.O). Only fills it when you haven’t typed one.</p>
-    <label class="set-toggle"><input type="checkbox" id="setDiary" checked> <span>Diary fields needed</span></label>
+    <label class="set-toggle"><input type="checkbox" id="setDiary" checked> <span data-i18n="Diary fields needed">Diary fields needed</span></label>
     <p class="hint" style="margin:4px 0 0">Off hides the Diary short text, long text and photo-OCR from the entry form.</p>
     <hr>
-    <label class="set-label">Change PIN</label>
+    <label class="set-label" data-i18n="Change PIN">Change PIN</label>
     <input id="setNewPin" type="text" class="pinmask" inputmode="numeric" maxlength="8" placeholder="New PIN (4-8 digits)" autocomplete="off" data-form-type="other">
-    <button class="btn ghost block" id="setSavePin" style="margin-top:8px">Update PIN</button>
+    <button class="btn ghost block" id="setSavePin" style="margin-top:8px" data-i18n="Update PIN">Update PIN</button>
 
     <div id="adminSettings" style="display:none">
       <hr>
@@ -448,35 +455,35 @@
       <div id="adminUsers" class="admin-users"></div>
     </div>
 
-    <button class="btn danger block" id="setLogout" style="margin-top:14px">🚪 Logout</button>
-    <button class="btn ghost block" id="settingsClose" style="margin-top:10px">Close</button>
+    <button class="btn danger block" id="setLogout" style="margin-top:14px" data-i18n="🚪 Logout">🚪 Logout</button>
+    <button class="btn ghost block" id="settingsClose" style="margin-top:10px" data-i18n="Close">Close</button>
   </div>
 </div>
 
 <!-- ============ MENU MODAL ============ -->
 <div class="modal" id="menuModal" aria-hidden="true">
   <div class="modal-card">
-    <h3>Menu</h3>
-    <button class="menu-item" id="miSettings">⚙️ Settings (font, PIN, admin)</button>
-    <button class="menu-item" id="miLogout">🚪 Logout</button>
-    <button class="menu-item" id="miExport">⬇️ Export backup (JSON)</button>
-    <button class="menu-item" id="miExcel">📊 Export all data to Excel</button>
-    <button class="menu-item" id="miImport">⬆️ Import backup (JSON)</button>
-    <button class="menu-item" id="miReseed">🔄 Reload sample data (from Excel)</button>
-    <button class="menu-item danger" id="miClear">🗑️ Clear all data</button>
+    <h3 data-i18n="Menu">Menu</h3>
+    <button class="menu-item" id="miSettings" data-i18n="⚙️ Settings (font, PIN, admin)">⚙️ Settings (font, PIN, admin)</button>
+    <button class="menu-item" id="miLogout" data-i18n="🚪 Logout">🚪 Logout</button>
+    <button class="menu-item" id="miExport" data-i18n="⬇️ Export backup (JSON)">⬇️ Export backup (JSON)</button>
+    <button class="menu-item" id="miExcel" data-i18n="📊 Export all data to Excel">📊 Export all data to Excel</button>
+    <button class="menu-item" id="miImport" data-i18n="⬆️ Import backup (JSON)">⬆️ Import backup (JSON)</button>
+    <button class="menu-item" id="miReseed" data-i18n="🔄 Reload sample data (from Excel)">🔄 Reload sample data (from Excel)</button>
+    <button class="menu-item danger" id="miClear" data-i18n="🗑️ Clear all data">🗑️ Clear all data</button>
     <input type="file" id="importFile" accept="application/json" hidden>
-    <button class="btn ghost block" id="miClose">Close</button>
+    <button class="btn ghost block" id="miClose" data-i18n="Close">Close</button>
   </div>
 </div>
 
 <!-- ============ BACKUP REMINDER ============ -->
 <div class="modal" id="backupModal" aria-hidden="true">
   <div class="modal-card">
-    <h3>🔔 Weekly backup</h3>
+    <h3 data-i18n="🔔 Weekly backup">🔔 Weekly backup</h3>
     <p class="login-sub" id="backupMsg" style="text-align:left;margin:0 0 14px"></p>
-    <button class="btn primary block" id="bkJson">⬇️ Export backup (JSON)</button>
-    <button class="btn ghost block" id="bkExcel" style="margin-top:8px">📊 Export all data to Excel</button>
-    <button class="btn ghost block" id="bkClose" style="margin-top:12px">Remind me later</button>
+    <button class="btn primary block" id="bkJson" data-i18n="⬇️ Export backup (JSON)">⬇️ Export backup (JSON)</button>
+    <button class="btn ghost block" id="bkExcel" style="margin-top:8px" data-i18n="📊 Export all data to Excel">📊 Export all data to Excel</button>
+    <button class="btn ghost block" id="bkClose" style="margin-top:12px" data-i18n="Remind me later">Remind me later</button>
   </div>
 </div>
 

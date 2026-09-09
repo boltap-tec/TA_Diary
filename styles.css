@@ -109,6 +109,10 @@ main{max-width:var(--maxw);margin:0 auto;padding:16px}
 .quick-btn span{font-size:22px;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
   background:linear-gradient(135deg,#fbe7e7,#f6dede);color:var(--brand)}
 .quick-btn:active{transform:scale(.97)}
+/* Translated label span inside icon buttons — must not inherit the icon circle styling.
+   Specificity is raised to beat ".quick.quick4 .quick-btn span" and ".tab span". */
+.quick-btn .ib-lbl,.quick.quick4 .quick-btn .ib-lbl,.tab .ib-lbl{width:auto;height:auto;min-width:0;
+  background:none;border-radius:0;display:inline;font-size:inherit;color:inherit;place-items:initial}
 
 /* ---------- Section head ---------- */
 .section-head{display:flex;align-items:center;justify-content:space-between;margin:8px 0 12px;gap:10px}
