@@ -651,6 +651,7 @@ function setToday(v){
   updateModeFare();
   applyContextToForm();
   applyDiaryVisibility();
+  refreshFieldStates();
 }
 // Hide the Diary fields (short text, long/detail text, OCR) when the officer
 // turns off "Diary needed" in Settings. TA short text is not affected.
@@ -661,6 +662,18 @@ function applyDiaryVisibility(){
   }
 }
 $$('#todayWork button').forEach(b=>b.onclick=()=>setToday(b.dataset.v));
+
+// Mark each entry field as "filled" (has a value) so CSS can highlight completed
+// fields differently from empty ones. Runs on input/change and whenever the form
+// is (re)built. Works for text, number, date, time, select and textarea alike.
+function refreshFieldStates(){
+  $$('#view-entry .field').forEach(f=>{
+    const c=f.querySelector('input,select,textarea');
+    f.classList.toggle('is-filled', !!(c && String(c.value).trim()!==''));
+  });
+}
+$('#view-entry').addEventListener('input', refreshFieldStates);
+$('#view-entry').addEventListener('change', refreshFieldStates);
 
 function updateDaysVisibility(){
   const show = isField(curToday) && $('#fCompleted').value==='Yes';
