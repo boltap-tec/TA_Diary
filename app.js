@@ -311,7 +311,7 @@ function go(view){
   $$('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view===view));
   window.scrollTo(0,0);
   if(view==='home') renderHome();
-  if(view==='entry'){ if(!editingId) resetEntryForm(); }
+  if(view==='entry'){ if(!editingId) resetEntryForm(); animateEntryFields(); }
   if(view==='reports') renderReportSummary();
   if(view==='visit') renderVisits();
   if(view==='profile') loadProfileForm();
@@ -661,19 +661,36 @@ function applyDiaryVisibility(){
     $('#wrapDiaryDetail').style.display='none';
   }
 }
-$$('#todayWork button').forEach(b=>b.onclick=()=>setToday(b.dataset.v));
+$$('#todayWork button').forEach(b=>b.onclick=()=>{ setToday(b.dataset.v); animateEntryFields(); });
 
 // Mark each entry field as "filled" (has a value) so CSS can highlight completed
 // fields differently from empty ones. Runs on input/change and whenever the form
 // is (re)built. Works for text, number, date, time, select and textarea alike.
-function refreshFieldStates(){
+function refreshFieldStates(pop){
   $$('#view-entry .field').forEach(f=>{
     const c=f.querySelector('input,select,textarea');
-    f.classList.toggle('is-filled', !!(c && String(c.value).trim()!==''));
+    const filled=!!(c && String(c.value).trim()!=='');
+    const was=f.classList.contains('is-filled');
+    f.classList.toggle('is-filled', filled);
+    if(pop && filled && !was){                 // just went empty -> filled: little pop
+      f.classList.remove('just-filled'); void f.offsetWidth; f.classList.add('just-filled');
+      setTimeout(()=>f.classList.remove('just-filled'),360);
+    }
   });
 }
-$('#view-entry').addEventListener('input', refreshFieldStates);
-$('#view-entry').addEventListener('change', refreshFieldStates);
+$('#view-entry').addEventListener('input', ()=>refreshFieldStates(true));
+$('#view-entry').addEventListener('change', ()=>refreshFieldStates(true));
+
+// Staggered slide-up of the currently visible entry fields (form open / work-type switch)
+function animateEntryFields(){
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  const fields=$$('#view-entry .field').filter(f=>f.offsetParent!==null);
+  fields.forEach((f,i)=>{
+    f.classList.remove('anim-in'); void f.offsetWidth;
+    f.style.animationDelay=(i*35)+'ms';
+    f.classList.add('anim-in');
+  });
+}
 
 function updateDaysVisibility(){
   const show = isField(curToday) && $('#fCompleted').value==='Yes';

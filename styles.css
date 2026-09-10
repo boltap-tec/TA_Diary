@@ -165,14 +165,36 @@ textarea{resize:vertical}
 .field.is-filled input,
 .field.is-filled select,
 .field.is-filled textarea{background:#fbf8ef;border-color:#dcc684;color:var(--ink)}
+/* Little pop when a field first becomes filled */
+.field.just-filled input,
+.field.just-filled select,
+.field.just-filled textarea{animation:fieldPop .34s ease}
+@keyframes fieldPop{0%{transform:scale(1)}40%{transform:scale(1.018)}100%{transform:scale(1)}}
 
-/* Active field (cursor blinking) — clean white with a brand glow, and its label lights up */
+/* Active field (cursor blinking) — clean white with a brand glow, lifts slightly, label lights up */
 .field:focus-within label{color:var(--brand-2)}
 input:focus,select:focus,textarea:focus,
 .field:focus-within input,
 .field:focus-within select,
 .field:focus-within textarea{outline:none;background:#fff;border-color:var(--brand);
-  box-shadow:0 0 0 3px rgba(123,17,19,.12)}
+  box-shadow:0 0 0 3px rgba(123,17,19,.12),0 6px 16px rgba(123,17,19,.10);transform:translateY(-1px)}
+
+/* Staggered entrance for the entry fields (delay set inline by JS) */
+.field.anim-in{animation:fieldIn .34s cubic-bezier(.22,.61,.36,1) both}
+@keyframes fieldIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Chip press feedback */
+.chips-pick button{transition:transform .1s ease,background .12s,border-color .12s,color .12s}
+.chips-pick button:active{transform:scale(.95)}
+.chips-pick button.active{animation:chipPick .28s ease}
+@keyframes chipPick{0%{transform:scale(1)}45%{transform:scale(1.06)}100%{transform:scale(1)}}
+
+@media (prefers-reduced-motion:reduce){
+  .field.anim-in,.field.just-filled input,.field.just-filled select,.field.just-filled textarea,
+  .chips-pick button.active{animation:none}
+  input:focus,select:focus,textarea:focus,
+  .field:focus-within input,.field:focus-within select,.field:focus-within textarea{transform:none}
+}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
 .hint{font-size:12px;color:var(--muted);margin:-8px 0 0}
