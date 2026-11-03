@@ -489,9 +489,11 @@ $('#userClose').onclick=()=>$('#userModal').classList.remove('open');
    ========================================================= */
 let homeFilter='all';
 function monthEntries(){ const ym=todayISO().slice(0,7); return DB.e.filter(e=>(e.fromDate||'').slice(0,7)===ym); }
+// Mileage (km) of a journey: its distance when travelled by bike, else 0.
+const mileageKm=e=>String(e.mode||'').trim().toLowerCase()==='bike'?(+e.distance||0):0;
 function taOf(list, p){
   const es=list.filter(e=>isField(e.today));
-  const bikeDist=es.filter(e=>e.mode==='Bike').reduce((s,e)=>s+(+e.distance||0),0);
+  const bikeDist=es.reduce((s,e)=>s+mileageKm(e),0);   // sum of the Mileage column
   const fare=es.filter(e=>['Bus','Train'].includes(e.mode)).reduce((s,e)=>s+(+e.fare||0),0);
   const autoFare=es.filter(e=>e.mode==='Auto').reduce((s,e)=>s+(+e.fare||0),0);
   const days=es.reduce((s,e)=>s+(+e.days||0),0);
@@ -1338,8 +1340,9 @@ function docTA(){
     <td class="center">${esc(e.mode)}</td>
     <td class="num">${(+e.distance||0)?(+e.distance).toFixed(2):''}</td>
     <td class="num">${(+e.fare||0)?(+e.fare).toFixed(2):''}</td>
+    <td class="num">${mileageKm(e)?mileageKm(e).toFixed(2):''}</td>
     <td class="center">${(+e.days||0)?(+e.days).toFixed(2):''}</td>
-    <td>${esc(e.taShort||e.diaryShort||e.purpose)}</td></tr>`).join('') || `<tr><td colspan="9" class="center muted">No journeys in this period</td></tr>`;
+    <td>${esc(e.taShort||e.diaryShort||e.purpose)}</td></tr>`).join('') || `<tr><td colspan="10" class="center muted">No journeys in this period</td></tr>`;
   const words=numWords(Math.round(net));
   const dailyWords=numWords(Math.round(t.daily));
 
@@ -1368,16 +1371,16 @@ function docTA(){
     <div class="kv">4. Headquarters &nbsp;: <b>${esc(p.parent)} - ${esc(p.pincode)}</b></div>
     <div class="kv">5. Details and purposes of Journey(s) performed &nbsp; <b>${periodLabel()}</b></div>
     <table>
-      <colgroup><col style="width:12%"><col style="width:15%"><col style="width:12%"><col style="width:15%"><col style="width:6%">
-        <col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:17%"></colgroup>
+      <colgroup><col style="width:12%"><col style="width:14%"><col style="width:12%"><col style="width:14%"><col style="width:6%">
+        <col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:7%"><col style="width:13%"></colgroup>
       <thead>
-        <tr><th>-1</th><th>-2</th><th>-3</th><th>-4</th><th>-5</th><th>-6</th><th>-7</th><th>-8</th><th>-9</th></tr>
+        <tr><th>-1</th><th>-2</th><th>-3</th><th>-4</th><th>-5</th><th>-6</th><th>-7</th><th>-8</th><th>-9</th><th>-10</th></tr>
         <tr><th>Date &amp; Time From</th><th>From Office/Place</th><th>Date &amp; Time To</th><th>To Office/Place</th>
-            <th>Mode</th><th>Dist (Km)</th><th>Fare (Rs)</th><th>Days</th><th>Purpose of Journey</th></tr>
+            <th>Mode</th><th>Dist (Km)</th><th>Fare (Rs)</th><th style="overflow-wrap:normal;word-break:keep-all">Mileage (Km)</th><th>Days</th><th>Purpose of Journey</th></tr>
       </thead>
       <tbody>${rows}
         <tr class="tot"><td class="right" colspan="5">Total ${t.bikeDist.toFixed(0)} Kms by Bike</td>
-          <td class="num">${t.bikeDist.toFixed(0)}</td><td class="num">${t.fare.toFixed(2)}</td>
+          <td></td><td class="num">${t.fare.toFixed(2)}</td><td class="num">${t.bikeDist.toFixed(2)}</td>
           <td class="center">${t.days.toFixed(2)}</td><td></td></tr>
       </tbody>
     </table>
