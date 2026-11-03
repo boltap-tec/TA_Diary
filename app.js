@@ -1371,8 +1371,8 @@ function docTA(){
     <div class="kv">4. Headquarters &nbsp;: <b>${esc(p.parent)} - ${esc(p.pincode)}</b></div>
     <div class="kv">5. Details and purposes of Journey(s) performed &nbsp; <b>${periodLabel()}</b></div>
     <table>
-      <colgroup><col style="width:12%"><col style="width:14%"><col style="width:12%"><col style="width:14%"><col style="width:6%">
-        <col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:7%"><col style="width:13%"></colgroup>
+      <colgroup><col style="width:12%"><col style="width:14%"><col style="width:12%"><col style="width:14%"><col style="width:7%">
+        <col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:11%"></colgroup>
       <thead>
         <tr><th>-1</th><th>-2</th><th>-3</th><th>-4</th><th>-5</th><th>-6</th><th>-7</th><th>-8</th><th>-9</th><th>-10</th></tr>
         <tr><th>Date &amp; Time From</th><th>From Office/Place</th><th>Date &amp; Time To</th><th>To Office/Place</th>
