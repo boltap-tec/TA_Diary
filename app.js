@@ -76,16 +76,22 @@ const profileToRow = p => ({email:p.email,name:p.name||'',designation:p.desg||''
    Without this, tables larger than 1000 rows (entries, routes, …) load only
    partially, so recent entries silently go missing from the app. */
 async function sbSelectAll(table, orderCol){
-  const c=sbClient(); const size=1000; const out=[]; let from=0;
-  for(;;){
-    let q=c.from(table).select('*').range(from, from+size-1);
+  const c=sbClient(); const size=1000;
+  const page=(from, count)=>{
+    let q=c.from(table).select('*', count?{count:'exact'}:undefined).range(from, from+size-1);
     if(orderCol) q=q.order(orderCol,{ascending:true});
-    const { data, error } = await q;
-    if(error) throw error;
-    out.push(...(data||[]));
-    if(!data || data.length<size) break;
-    from += size;
-  }
+    return q;
+  };
+  // First page also returns the total row count, so the remaining pages can be
+  // fetched all at once instead of one after another.
+  const first = await page(0, true);
+  if(first.error) throw first.error;
+  const out=[...(first.data||[])];
+  const total = first.count ?? out.length;
+  if(out.length<size || total<=size) return out;
+  const rest=[];
+  for(let from=size; from<total; from+=size) rest.push(page(from,false));
+  for(const r of await Promise.all(rest)){ if(r.error) throw r.error; out.push(...(r.data||[])); }
   return out;
 }
 
@@ -100,15 +106,47 @@ async function sbPull(){
     { const m={}; offs.forEach(o=>m[(o.name||'').toLowerCase()]=o.pincode); (window.TA_SEED=window.TA_SEED||{}).officePins=m; }
     { const m={}; rts.forEach(r=>m[(r.office_from||'').toLowerCase()+'||'+(r.office_to||'').toLowerCase()]={d:+r.distance||0,f:+r.fare||0}); (window.TA_SEED=window.TA_SEED||{}).routes=m; }
     if(profs.length){ DB.profiles = profs.map(rowToProfile); hydrateSettingsFromProfiles(); }
-    DB.allE = ents.map(rowToEntry);
-    DB.allV = vis.map(rowToVisit);
-  }catch(e){ console.warn('sbPull failed (using cached data):', e.message); }
+    // Edits made while this download was running (background sync after a fast
+    // login) must not be overwritten by the slightly older server copy.
+    DB.allE = mergeLocalEdits(ents.map(rowToEntry), DB.allE, syncEdits.e);
+    DB.allV = mergeLocalEdits(vis.map(rowToVisit), DB.allV, syncEdits.v);
+    return true;
+  }catch(e){ console.warn('sbPull failed (using cached data):', e.message); return false; }
+  finally{ syncEdits.e.clear(); syncEdits.v.clear(); }
+}
+// ids saved (true) or deleted (false) while a pull is in flight
+const syncEdits={ e:new Map(), v:new Map() };
+function mergeLocalEdits(server, local, edits){
+  if(!edits.size) return server;
+  const byId=new Map(local.map(x=>[x.id,x]));
+  const out=server.filter(x=>!edits.has(x.id));
+  edits.forEach((saved,id)=>{ if(saved && byId.has(id)) out.push(byId.get(id)); });
+  return out;
+}
+function markSynced(email){ const m=LS.get('ta_synced',{}); m[email]=Date.now(); LS.set('ta_synced',m); }
+// Refresh the local copy after a fast login, then redraw whatever screen is open.
+let bgSyncing=false;
+async function sbBackgroundSync(email){
+  if(bgSyncing) return; bgSyncing=true;
+  try{
+    const ok=await sbPull();
+    if(!ok || DB.active!==email) return;
+    markSynced(email);
+    renderHeader();
+    if(typeof curView!=='undefined'){
+      if(curView==='home') renderHome();
+      else if(curView==='month') renderMonth();
+      else if(curView==='visit') renderVisits();
+      else if(curView==='reports') renderReportSummary();
+      // the entry form is left alone so nothing being typed is disturbed
+    }
+  } finally { bgSyncing=false; }
 }
 /* best-effort writes */
-async function sbUpsertEntry(e){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_entries').upsert(entryToRow(e)); }catch(err){ console.warn('entry sync',err.message); } }
-async function sbDeleteEntry(id){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_entries').delete().eq('id',id); }catch(err){} }
-async function sbUpsertVisit(v){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_visits').upsert(visitToRow(v)); }catch(err){ console.warn('visit sync',err.message); } }
-async function sbDeleteVisit(id){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_visits').delete().eq('id',id); }catch(err){} }
+async function sbUpsertEntry(e){ const c=sbClient(); if(!sbOn()) return; if(bgSyncing) syncEdits.e.set(e.id,true); try{ await c.from('ta_entries').upsert(entryToRow(e)); }catch(err){ console.warn('entry sync',err.message); } }
+async function sbDeleteEntry(id){ const c=sbClient(); if(!sbOn()) return; if(bgSyncing) syncEdits.e.set(id,false); try{ await c.from('ta_entries').delete().eq('id',id); }catch(err){} }
+async function sbUpsertVisit(v){ const c=sbClient(); if(!sbOn()) return; if(bgSyncing) syncEdits.v.set(v.id,true); try{ await c.from('ta_visits').upsert(visitToRow(v)); }catch(err){ console.warn('visit sync',err.message); } }
+async function sbDeleteVisit(id){ const c=sbClient(); if(!sbOn()) return; if(bgSyncing) syncEdits.v.set(id,false); try{ await c.from('ta_visits').delete().eq('id',id); }catch(err){} }
 async function sbUpsertProfile(p){ const c=sbClient(); if(!sbOn()) return; try{ await c.from('ta_profiles').upsert(profileToRow(p)); }catch(err){ console.warn('profile sync',err.message); } }
 // Per-user settings live on the officer's ta_profiles row (jsonb `settings`) so they
 // follow the user to any browser/device instead of being stuck in one browser's localStorage.
@@ -167,8 +205,19 @@ async function doLogin(){
       const { data, error } = await sbClient().auth.signInWithPassword({ email, password: pinToPass(pin) });
       if(error){ loginErr('Incorrect email or PIN. (Default PIN is 1234)'); return; }
       DB.active=email; localStorage.setItem('ta_session',email);
-      await sbPull();
-      finishLoginUI();
+      // Fast path: if this device has already synced this officer's data once,
+      // open Home straight away from the local copy and refresh it in the
+      // background. First sign-in on a device still waits for the download,
+      // otherwise Home would show the bundled sample data.
+      const synced = LS.get('ta_synced', {});
+      if(synced[email] && DB.p){
+        finishLoginUI();
+        sbBackgroundSync(email);
+      } else {
+        loginErr('Loading your data…'); $('#loginMsg').classList.remove('err');
+        if(await sbPull()) markSynced(email);
+        finishLoginUI();
+      }
     }catch(e){ loginErr('Network error — check your connection and try again.'); }
     return;
   }
