@@ -123,6 +123,18 @@ main{max-width:var(--maxw);margin:0 auto;padding:16px}
 .seg button{flex:1;border:none;background:transparent;padding:8px 11px;border-radius:9px;color:var(--muted);font-weight:700;font-size:12.5px;white-space:nowrap}
 .seg button.active{background:#fff;color:var(--brand);box-shadow:var(--shadow-sm)}
 
+/* ---------- Diary search ---------- */
+.search-box{position:relative;display:flex;align-items:center;margin:0 0 12px}
+.search-box input{width:100%;border:1px solid var(--line);background:var(--card);border-radius:12px;
+  padding:11px 38px 11px 38px;font:inherit;font-size:14px;box-shadow:var(--shadow-sm);outline:none;-webkit-appearance:none;appearance:none}
+.search-box input:focus{border-color:var(--brand)}
+.search-box input::-webkit-search-cancel-button{display:none}
+.search-ic{position:absolute;left:12px;font-size:14px;opacity:.6;pointer-events:none}
+.search-clear{position:absolute;right:6px;border:none;background:transparent;color:var(--muted);font-size:14px;
+  width:30px;height:30px;border-radius:8px;display:none;cursor:pointer}
+.search-box.has-q .search-clear{display:block}
+.search-count{font-size:12px;color:var(--muted);margin:-4px 2px 0}
+
 /* ---------- Cards / list ---------- */
 .list{display:flex;flex-direction:column;gap:11px}
 .card{background:var(--card);border-radius:16px;padding:14px 15px;box-shadow:var(--shadow-sm);border:1px solid var(--line);position:relative}

@@ -304,8 +304,18 @@ function computeContext(){
    NAVIGATION
    ========================================================= */
 let editingId = null;
+// Scroll memory: when you leave Home / Month for the entry form (Edit, ＋),
+// remember where you were and land back on the same spot when you return.
+let curView='home', returnView=null;
+const scrollMemo={};
 function go(view){
   if(view==='visit' && !visitOn(DB.active)) view='home';   // Visit is optional / off by default
+  const from=curView;
+  if(from!==view) scrollMemo[from]=window.scrollY;
+  if(view==='entry' && (from==='home'||from==='month')) returnView=from;
+  const restore = (from==='entry' && view===returnView) ? (scrollMemo[view]||0) : 0;
+  if(from==='entry' && view!=='entry') returnView=null;
+  curView=view;
   $$('.view').forEach(v=>v.classList.remove('active'));
   $('#view-'+view).classList.add('active');
   $$('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view===view));
@@ -316,6 +326,8 @@ function go(view){
   if(view==='visit') renderVisits();
   if(view==='profile') loadProfileForm();
   if(view==='month') renderMonth();
+  // back from the entry form → put the list where it was (after it has been rendered)
+  if(restore){ window.scrollTo(0,restore); setTimeout(()=>{ if(curView===view && window.scrollY<restore-5) window.scrollTo(0,restore); },60); }
 }
 let forceDate=null;   // when adding an entry for a specific date (from Month view)
 $$('.tab, .quick-btn').forEach(t=>t.addEventListener('click',()=>{
@@ -368,6 +380,7 @@ const I18N = { ta: {
   "Estimated travelling allowance":"மதிப்பிடப்பட்ட பயணப்படி",
   "Next diary entry":"அடுத்த நாட்குறிப்பு பதிவு","New":"புதியது","TA Bill":"TA பில்",
   "Month":"மாதம்","Diary":"நாட்குறிப்பு",
+  "Search by date or office name":"தேதி அல்லது அலுவலகப் பெயரால் தேடுக",
   "All":"அனைத்தும்","Tour":"சுற்றுப்பயணம்","Office":"அலுவலகம்","Leave":"விடுப்பு",
   "First entry":"முதல் பதிவு","Pick your own date to start":"தொடங்க உங்கள் தேதியைத் தேர்வுசெய்யவும்",
   "Entries":"பதிவுகள்","Bike km":"பைக் கி.மீ","DA days":"DA நாட்கள்","Fare":"கட்டணம்",
@@ -547,10 +560,14 @@ function renderHome(){
   let items=sortEntries(DB.e).reverse();
   if(homeFilter==='Leave') items=items.filter(e=>isLeave(e.today));
   else if(homeFilter!=='all') items=items.filter(e=>e.today===homeFilter);
+  const q=homeSearch.trim().toLowerCase();
+  if(q) items=items.filter(e=>entryMatches(e,q));
   const box=$('#entryList');
   if(!DB.p){ box.innerHTML=`<div class="empty"><div class="big">👤</div>No officer selected.<br>Add your profile to begin.</div>`; return; }
-  box.innerHTML = items.length ? items.slice(0,120).map(renderEntryCard).join('')
-    : `<div class="empty"><div class="big">🗒️</div>No entries yet.<br>Tap ＋ to add your first diary entry.</div>`;
+  const head = q ? `<div class="search-count">${items.length} ${items.length===1?'match':'matches'}${items.length>120?' · showing first 120':''}</div>` : '';
+  box.innerHTML = head + (items.length ? items.slice(0,120).map(renderEntryCard).join('')
+    : q ? `<div class="empty"><div class="big">🔍</div>No entries match “${esc(homeSearch.trim())}”.</div>`
+    : `<div class="empty"><div class="big">🗒️</div>No entries yet.<br>Tap ＋ to add your first diary entry.</div>`);
   bindCardActions(box);
 }
 const bstat=(n,l)=>`<div class="bstat"><div class="bstat-n">${n}</div><div class="bstat-l">${l}</div></div>`;
@@ -604,6 +621,30 @@ function bindCardActions(box){
     if(confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==b.dataset.del); sbDeleteEntry(b.dataset.del); toast('Entry deleted'); renderHome(); }
   });
 }
+// Diary search: matches dates (02/11/2026, 2/11, 02-11-2026, 2026-11-02, Monday, Nov)
+// and office / place names, plus purpose and leave type. All words must match.
+let homeSearch='';
+function entryMatches(e,q){
+  const iso=e.fromDate||'';
+  const [y,m,d]=iso.split('-');
+  const hay=[
+    iso, fmtDate(iso), d&&`${d}-${m}-${y}`, d&&`${d}.${m}.${y}`, d&&`${+d}/${+m}/${y}`, d&&`${+d}/${+m}`,
+    iso&&weekday(iso), m&&MON[+m-1],
+    e.toDate&&fmtDate(e.toDate),
+    e.officeFrom, e.officeTo, catMeta(e).label, e.purpose, e.leaveType, e.today, e.mode,
+    e.diaryShort, e.taShort
+  ].filter(Boolean).join(' | ').toLowerCase();
+  return q.split(/\s+/).every(w=>hay.includes(w));
+}
+let searchTimer=null;
+$('#homeSearch').addEventListener('input',ev=>{
+  homeSearch=ev.target.value;
+  $('.search-box').classList.toggle('has-q',!!homeSearch);
+  clearTimeout(searchTimer); searchTimer=setTimeout(renderHome,120);
+});
+$('#homeSearchClear').onclick=()=>{
+  $('#homeSearch').value=''; homeSearch=''; $('.search-box').classList.remove('has-q'); renderHome(); $('#homeSearch').focus();
+};
 $$('#homeFilter button').forEach(b=>b.onclick=()=>{
   $$('#homeFilter button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
   homeFilter=b.dataset.f; renderHome();
@@ -957,7 +998,7 @@ function loadEntryForm(id){
   showFromDay(); updateDateTimeLabels();
 }
 $('#btnDeleteEntry').onclick=()=>{
-  if(editingId && confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==editingId); sbDeleteEntry(editingId); editingId=null; toast('Entry deleted'); go('home'); }
+  if(editingId && confirm('Delete this entry?')){ DB.allE=DB.allE.filter(e=>e.id!==editingId); sbDeleteEntry(editingId); editingId=null; toast('Entry deleted'); go(returnView||'home'); }
 };
 
 $('#btnSaveEntry').onclick=()=>{
@@ -1027,9 +1068,9 @@ $('#btnSaveEntry').onclick=()=>{
   toast(editingId?'Entry updated ✓':(continueDay?'Leg saved — continue this date ✓':'Entry saved ✓'));
   editingId=null;
   if(continueDay){ go('entry'); }   // context keeps the same trip/date on the next leg
-  else go('home');
+  else go(returnView||'home');
 };
-$('#btnCancelEntry').onclick=()=>{ editingId=null; go('home'); };
+$('#btnCancelEntry').onclick=()=>{ editingId=null; go(returnView||'home'); };
 
 /* Suggestion pools (built fresh each call so they include the latest entries). */
 const _uniq = arr => [...new Set(arr.filter(Boolean).map(x=>x.toString().trim()).filter(Boolean))];
